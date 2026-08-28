@@ -21,7 +21,13 @@ export default function RootLayout({
     // `scroll-behavior: smooth` in globals.css, so navigation jumps to the top
     // instead of animating there.
     <html lang="en" className={inter.variable} data-scroll-behavior="smooth">
-      <body className={`flex min-h-screen flex-col font-sans`}>{children}</body>
+      {/* Browser extensions commonly add attributes to <body> before React
+          hydrates (ColorZilla's cz-shortcut-listen, password managers, and so
+          on). This silences the resulting mismatch for body's own attributes
+          only; children are still checked normally. */}
+      <body suppressHydrationWarning className="flex min-h-screen flex-col font-sans">
+        {children}
+      </body>
     </html>
   );
 }
