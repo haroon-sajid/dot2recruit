@@ -1,4 +1,4 @@
-# RecruitAI
+# Dot2Recruit
 
 AI-powered recruitment screening system built with Next.js, Supabase, and n8n.
 
