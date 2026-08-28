@@ -58,6 +58,15 @@ function IconAlerts() {
   );
 }
 
+function IconPositions() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
+      <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+    </svg>
+  );
+}
+
 function IconAnalytics() {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
@@ -137,8 +146,9 @@ function IconChevronsRight() {
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: IconDashboard, exact: true },
-  { href: "/new-candidate", label: "New Candidate", icon: IconNewCandidate },
+  { href: "/new-candidate", label: "Screen Candidate", icon: IconNewCandidate },
   { href: "/candidates", label: "Candidates", icon: IconCandidates },
+  { href: "/positions", label: "Positions", icon: IconPositions },
   { href: "/analytics", label: "Reports", icon: IconAnalytics },
   { href: "/interviews", label: "Interviews", icon: IconInterview },
   { href: "/hiring-assistant", label: "Hiring Assistant", icon: IconHiringAssistant },

@@ -33,7 +33,7 @@ export function ComingSoon({
     <div className="space-y-6">
       <PageHeader title={title} subtitle={description} />
 
-      <div className="max-w-2xl rounded-xl border border-gray-100 bg-white p-8 shadow-[0_4px_20px_rgba(79,70,229,0.06)]">
+      <div className="rounded-xl border border-gray-100 bg-white p-8 shadow-[0_4px_20px_rgba(79,70,229,0.06)]">
         <div className="flex items-start gap-4">
           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#EBF3FC] text-[#4A90E2]">
             {icon}
@@ -53,10 +53,13 @@ export function ComingSoon({
           <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400">
             Planned capabilities
           </h3>
-          <ul className="mt-3 space-y-2.5">
+          <ul className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {capabilities.map((capability) => (
-              <li key={capability} className="flex items-start gap-3 text-sm text-gray-700">
-                <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-400">
+              <li
+                key={capability}
+                className="flex items-start gap-3 rounded-lg bg-gray-50 p-4 text-sm text-gray-700"
+              >
+                <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white text-gray-400 ring-1 ring-inset ring-gray-200">
                   <IconCheck />
                 </span>
                 <span className="leading-6">{capability}</span>

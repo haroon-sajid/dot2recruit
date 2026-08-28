@@ -12,6 +12,14 @@ export const candidateInputSchema = z.object({
 
 export type CandidateInputSchema = z.infer<typeof candidateInputSchema>;
 
+/** Body for POST /api/job-descriptions (a saved, reusable position). */
+export const jobDescriptionInputSchema = z.object({
+  title: z.string().trim().min(2, "Title must be at least 2 characters"),
+  jd_text: z.string().trim().min(50, "Job description must be at least 50 characters"),
+});
+
+export type JobDescriptionInputSchema = z.infer<typeof jobDescriptionInputSchema>;
+
 /**
  * The `result` object n8n posts back. Keys are snake_case so they map 1:1
  * onto `screening_results` columns.

@@ -1,8 +1,9 @@
-// Candidates dashboard: stats overview plus a table of all submitted candidates.
+// Candidates dashboard: stats overview plus a card grid of all submitted candidates.
 "use client";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { CandidateModal } from "@/components/candidate-modal";
 import { DECISION_META, scoreTone } from "@/components/result-card";
 import { StatusBadge } from "@/components/status-badge";
 import { MetricCard } from "@/components/ui/metric-card";
@@ -37,9 +38,67 @@ function computeStats(candidates: CandidateWithResult[]) {
   };
 }
 
+function CandidateCard({
+  candidate,
+  onOpen,
+}: {
+  candidate: CandidateWithResult;
+  onOpen: () => void;
+}) {
+  const result = candidate.screening_result;
+  const decision = result ? DECISION_META[result.decision] : null;
+
+  return (
+    <div className="flex flex-col rounded-xl border border-gray-100 bg-white p-5 shadow-[0_4px_20px_rgba(79,70,229,0.06)] transition hover:shadow-md">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="truncate text-sm font-semibold text-gray-900">{candidate.name}</h3>
+          <p className="mt-0.5 truncate text-xs text-gray-500">{candidate.position}</p>
+        </div>
+        <StatusBadge status={candidate.status} />
+      </div>
+
+      <div className="mt-4 flex items-end justify-between gap-3">
+        <div>
+          {result ? (
+            <p className={`text-3xl font-bold leading-none ${scoreTone(result.overall_score).text}`}>
+              {result.overall_score}
+              <span className="ml-1 text-sm font-medium text-gray-400">/ 100</span>
+            </p>
+          ) : (
+            <p className="text-3xl font-bold leading-none text-gray-300">—</p>
+          )}
+        </div>
+        {decision ? (
+          <span
+            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${decision.badge}`}
+          >
+            {decision.label}
+          </span>
+        ) : (
+          <span className="text-xs text-gray-400">Not screened yet</span>
+        )}
+      </div>
+
+      <p className="mt-4 border-t border-gray-100 pt-3 text-xs text-gray-400">
+        Submitted {formatDate(candidate.created_at)}
+      </p>
+
+      <button
+        type="button"
+        onClick={onOpen}
+        className="mt-3 w-full rounded-lg bg-white px-4 py-2 text-xs font-semibold text-[#4A90E2] shadow-sm ring-1 ring-inset ring-gray-200 transition hover:bg-[#EBF3FC] focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/40"
+      >
+        View details
+      </button>
+    </div>
+  );
+}
+
 export default function CandidatesPage() {
   const [candidates, setCandidates] = useState<CandidateWithResult[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -82,7 +141,7 @@ export default function CandidatesPage() {
             <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
               <path d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" />
             </svg>
-            New Candidate
+            Screen Candidate
           </Link>
         }
       />
@@ -125,75 +184,18 @@ export default function CandidatesPage() {
           </div>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-[0_4px_20px_rgba(79,70,229,0.06)]">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-100 text-sm">
-              <thead className="bg-gray-50/60 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                <tr>
-                  <th scope="col" className="px-5 py-3.5">Name</th>
-                  <th scope="col" className="px-5 py-3.5">Position</th>
-                  <th scope="col" className="px-5 py-3.5">Submitted</th>
-                  <th scope="col" className="px-5 py-3.5">Status</th>
-                  <th scope="col" className="px-5 py-3.5 text-right">Score</th>
-                  <th scope="col" className="px-5 py-3.5">Decision</th>
-                  <th scope="col" className="px-5 py-3.5">
-                    <span className="sr-only">Actions</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {candidates.map((candidate) => {
-                  const result = candidate.screening_result;
-                  const decision = result ? DECISION_META[result.decision] : null;
-                  return (
-                    <tr key={candidate.id} className="transition hover:bg-[#F5F7FF]">
-                      <td className="px-5 py-3.5">
-                        <div className="font-semibold text-gray-900">{candidate.name}</div>
-                        <div className="text-xs text-gray-500">{candidate.email}</div>
-                      </td>
-                      <td className="px-5 py-3.5 text-gray-700">{candidate.position}</td>
-                      <td className="whitespace-nowrap px-5 py-3.5 text-gray-500">
-                        {formatDate(candidate.created_at)}
-                      </td>
-                      <td className="px-5 py-3.5">
-                        <StatusBadge status={candidate.status} />
-                      </td>
-                      <td className="px-5 py-3.5 text-right font-bold tabular-nums">
-                        {result ? (
-                          <span className={scoreTone(result.overall_score).text}>
-                            {result.overall_score}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">—</span>
-                        )}
-                      </td>
-                      <td className="px-5 py-3.5">
-                        {decision ? (
-                          <span
-                            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${decision.badge}`}
-                          >
-                            {decision.label}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">—</span>
-                        )}
-                      </td>
-                      <td className="px-5 py-3.5 text-right">
-                        <Link
-                          href={`/candidates/${candidate.id}`}
-                          className="font-semibold text-[#4A90E2] transition hover:text-[#3A7BD5]"
-                        >
-                          View
-                        </Link>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {candidates.map((candidate) => (
+            <CandidateCard
+              key={candidate.id}
+              candidate={candidate}
+              onOpen={() => setOpenId(candidate.id)}
+            />
+          ))}
         </div>
       )}
+
+      {openId && <CandidateModal candidateId={openId} onClose={() => setOpenId(null)} />}
     </div>
   );
 }

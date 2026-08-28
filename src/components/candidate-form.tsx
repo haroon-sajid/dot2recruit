@@ -1,11 +1,13 @@
 // Component: form for submitting a candidate (name, email, position, CV text, job description).
+// CV and job description can be typed, pasted, or extracted from an uploaded file.
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
+import { FileDrop } from "@/components/file-drop";
 import { candidateInputSchema } from "@/lib/validations";
-import type { CandidateInput } from "@/types";
+import type { CandidateInput, ExtractTextResponse, JobDescription } from "@/types";
 
 const POSITION_OPTIONS = [
   "Full-Stack AI Automation Developer",
@@ -17,6 +19,8 @@ const MIN_TEXT_LENGTH = 50;
 
 type FieldName = keyof CandidateInput;
 type FieldErrors = Partial<Record<FieldName, string>>;
+/** Which fields were prefilled from an uploaded CV, so the hint can be shown and then cleared. */
+type AutoFilled = Partial<Record<"name" | "email" | "position", boolean>>;
 
 function Spinner() {
   return (
@@ -52,6 +56,18 @@ function FieldError({ id, message }: { id: string; message?: string }) {
   );
 }
 
+function AutoFillHint({ show }: { show?: boolean }) {
+  if (!show) return null;
+  return (
+    <p className="mt-1 flex items-center gap-1 text-xs text-[#4A90E2]">
+      <svg className="h-3 w-3" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 2l1.5 5.5L19 9l-5.5 1.5L12 16l-1.5-5.5L5 9l5.5-1.5L12 2z" />
+      </svg>
+      Auto-filled from CV
+    </p>
+  );
+}
+
 /** Take the first message per field from a zod/API `fieldErrors` map. */
 function firstErrors(
   errors: Partial<Record<FieldName, string[] | undefined>>,
@@ -72,16 +88,119 @@ export function CandidateForm() {
   const [cvText, setCvText] = useState("");
   const [jdText, setJdText] = useState("");
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [autoFilled, setAutoFilled] = useState<AutoFilled>({});
   const [apiError, setApiError] = useState<string | null>(null);
   const [savedId, setSavedId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [positions, setPositions] = useState<JobDescription[]>([]);
+  const [selectedPositionId, setSelectedPositionId] = useState("");
+  const [saveJd, setSaveJd] = useState(false);
 
   const isCustom = positionChoice === CUSTOM_POSITION;
   const position = isCustom ? customPosition : positionChoice;
 
+  // Saved positions for the "Select saved position" dropdown. A failure here
+  // only hides the dropdown; uploading and pasting still work.
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/job-descriptions", { cache: "no-store" })
+      .then((res) => (res.ok ? (res.json() as Promise<{ jobDescriptions: JobDescription[] }>) : null))
+      .then((data) => {
+        if (!cancelled && data?.jobDescriptions) setPositions(data.jobDescriptions);
+      })
+      .catch(() => {
+        // Non-blocking: the dropdown just stays empty.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   function clearError(field: FieldName) {
     if (fieldErrors[field]) {
       setFieldErrors((prev) => ({ ...prev, [field]: undefined }));
+    }
+  }
+
+  function clearAutoFill(field: keyof AutoFilled) {
+    setAutoFilled((prev) => (prev[field] ? { ...prev, [field]: false } : prev));
+  }
+
+  /**
+   * Fill the CV text, then prefill name, email, and position from the detected
+   * values. Only empty fields are touched, so anything already typed survives.
+   */
+  function handleCvExtracted({ text, detected }: ExtractTextResponse) {
+    setCvText(text);
+    clearError("cvText");
+
+    const filled: AutoFilled = {};
+
+    if (detected.name && name.trim() === "") {
+      setName(detected.name);
+      clearError("name");
+      filled.name = true;
+    }
+    if (detected.email && email.trim() === "") {
+      setEmail(detected.email);
+      clearError("email");
+      filled.email = true;
+    }
+    if (detected.position && positionChoice === "" && customPosition.trim() === "") {
+      setPositionChoice(CUSTOM_POSITION);
+      setCustomPosition(detected.position);
+      clearError("position");
+      filled.position = true;
+    }
+
+    setAutoFilled((prev) => ({ ...prev, ...filled }));
+  }
+
+  function handleJdExtracted({ text }: ExtractTextResponse) {
+    setJdText(text);
+    clearError("jdText");
+    // The text no longer matches the chosen saved position.
+    setSelectedPositionId("");
+  }
+
+  /**
+   * Fill the job description and the position title from a saved position.
+   * Both stay editable afterwards.
+   */
+  function handleSelectPosition(id: string) {
+    setSelectedPositionId(id);
+    if (!id) return;
+
+    const saved = positions.find((p) => p.id === id);
+    if (!saved) return;
+
+    setJdText(saved.jd_text);
+    clearError("jdText");
+    // Saving it again would just duplicate the row.
+    setSaveJd(false);
+
+    const known = POSITION_OPTIONS.find((option) => option === saved.title);
+    if (known) {
+      setPositionChoice(known);
+      setCustomPosition("");
+    } else {
+      setPositionChoice(CUSTOM_POSITION);
+      setCustomPosition(saved.title);
+    }
+    clearError("position");
+    clearAutoFill("position");
+  }
+
+  /** Save the submitted JD as a reusable position. Failures are ignored on purpose. */
+  async function persistJobDescription(title: string, jd_text: string) {
+    try {
+      await fetch("/api/job-descriptions", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ title, jd_text }),
+      });
+    } catch {
+      // The screening already succeeded; a failed save must not block the user.
     }
   }
 
@@ -112,6 +231,9 @@ export function CandidateForm() {
       };
 
       if (res.status === 201 && data.id) {
+        if (saveJd) {
+          await persistJobDescription(parsed.data.position, parsed.data.jdText);
+        }
         router.push(`/candidates/${data.id}`);
         return; // keep the button disabled while navigating
       }
@@ -162,6 +284,7 @@ export function CandidateForm() {
             onChange={(e) => {
               setName(e.target.value);
               clearError("name");
+              clearAutoFill("name");
             }}
             disabled={submitting}
             aria-invalid={Boolean(fieldErrors.name)}
@@ -169,6 +292,7 @@ export function CandidateForm() {
             placeholder="Jane Doe"
             className={`mt-1 ${fieldClass(Boolean(fieldErrors.name))}`}
           />
+          <AutoFillHint show={autoFilled.name} />
           <FieldError id="name-error" message={fieldErrors.name} />
         </div>
 
@@ -185,6 +309,7 @@ export function CandidateForm() {
             onChange={(e) => {
               setEmail(e.target.value);
               clearError("email");
+              clearAutoFill("email");
             }}
             disabled={submitting}
             aria-invalid={Boolean(fieldErrors.email)}
@@ -192,6 +317,7 @@ export function CandidateForm() {
             placeholder="jane@example.com"
             className={`mt-1 ${fieldClass(Boolean(fieldErrors.email))}`}
           />
+          <AutoFillHint show={autoFilled.email} />
           <FieldError id="email-error" message={fieldErrors.email} />
         </div>
       </div>
@@ -207,6 +333,7 @@ export function CandidateForm() {
           onChange={(e) => {
             setPositionChoice(e.target.value);
             clearError("position");
+            clearAutoFill("position");
           }}
           disabled={submitting}
           aria-invalid={Boolean(fieldErrors.position)}
@@ -230,6 +357,7 @@ export function CandidateForm() {
             onChange={(e) => {
               setCustomPosition(e.target.value);
               clearError("position");
+              clearAutoFill("position");
             }}
             disabled={submitting}
             aria-label="Custom position title"
@@ -237,64 +365,112 @@ export function CandidateForm() {
             className={`mt-2 ${fieldClass(Boolean(fieldErrors.position))}`}
           />
         )}
+        <AutoFillHint show={autoFilled.position} />
         <FieldError id="position-error" message={fieldErrors.position} />
       </div>
 
-      <div>
-        <div className="flex items-baseline justify-between">
-          <label htmlFor="cvText" className="block text-sm font-medium text-gray-700">
-            CV / Resume
-          </label>
-          <span className="text-xs text-gray-500">
-            {cvText.trim().length} chars · min {MIN_TEXT_LENGTH}
-          </span>
+      {/* CV and JD sit side by side on wide screens so they can be compared while pasting.
+          The textareas use a viewport-relative height so the whole form fits on screen by
+          default, and keep resize-y so the corner grip still works. */}
+      <div className="grid gap-5 lg:grid-cols-2">
+        <div>
+          <div className="flex items-baseline justify-between">
+            <label htmlFor="cvText" className="block text-sm font-medium text-gray-700">
+              CV / Resume
+            </label>
+            <span className="text-xs text-gray-500">
+              {cvText.trim().length} chars · min {MIN_TEXT_LENGTH}
+            </span>
+          </div>
+          <FileDrop label="the CV" disabled={submitting} onExtracted={handleCvExtracted} />
+          <textarea
+            id="cvText"
+            name="cvText"
+            value={cvText}
+            onChange={(e) => {
+              setCvText(e.target.value);
+              clearError("cvText");
+            }}
+            disabled={submitting}
+            aria-invalid={Boolean(fieldErrors.cvText)}
+            aria-describedby="cvText-error"
+            placeholder="Paste the candidate's CV text here…"
+            className={`mt-2 h-[38vh] min-h-[180px] resize-y ${fieldClass(Boolean(fieldErrors.cvText))}`}
+          />
+          <FieldError id="cvText-error" message={fieldErrors.cvText} />
         </div>
-        <textarea
-          id="cvText"
-          name="cvText"
-          rows={8}
-          value={cvText}
-          onChange={(e) => {
-            setCvText(e.target.value);
-            clearError("cvText");
-          }}
-          disabled={submitting}
-          aria-invalid={Boolean(fieldErrors.cvText)}
-          aria-describedby="cvText-error"
-          placeholder="Paste the candidate's CV text here…"
-          className={`mt-1 resize-y ${fieldClass(Boolean(fieldErrors.cvText))}`}
-        />
-        <FieldError id="cvText-error" message={fieldErrors.cvText} />
+
+        <div>
+          <div className="flex items-baseline justify-between">
+            <label htmlFor="jdText" className="block text-sm font-medium text-gray-700">
+              Job description
+            </label>
+            <span className="text-xs text-gray-500">
+              {jdText.trim().length} chars · min {MIN_TEXT_LENGTH}
+            </span>
+          </div>
+          {/* Three ways to provide the JD: pick a saved position, upload a file, or paste. */}
+          {positions.length > 0 && (
+            <div className="mt-1">
+              <label
+                htmlFor="savedPosition"
+                className="block text-xs font-medium text-gray-500"
+              >
+                Select saved position
+              </label>
+              <select
+                id="savedPosition"
+                value={selectedPositionId}
+                onChange={(e) => handleSelectPosition(e.target.value)}
+                disabled={submitting}
+                className={`mt-1 ${fieldClass(false)}`}
+              >
+                <option value="">None, upload or paste below…</option>
+                {positions.map((saved) => (
+                  <option key={saved.id} value={saved.id}>
+                    {saved.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <FileDrop
+            label="the job description"
+            disabled={submitting}
+            onExtracted={handleJdExtracted}
+          />
+          <textarea
+            id="jdText"
+            name="jdText"
+            value={jdText}
+            onChange={(e) => {
+              setJdText(e.target.value);
+              clearError("jdText");
+              setSelectedPositionId("");
+            }}
+            disabled={submitting}
+            aria-invalid={Boolean(fieldErrors.jdText)}
+            aria-describedby="jdText-error"
+            placeholder="Paste the job description here…"
+            className={`mt-2 h-[38vh] min-h-[180px] resize-y ${fieldClass(Boolean(fieldErrors.jdText))}`}
+          />
+          <FieldError id="jdText-error" message={fieldErrors.jdText} />
+
+          <label className="mt-2 flex items-center gap-2 text-xs text-gray-600">
+            <input
+              type="checkbox"
+              checked={saveJd}
+              onChange={(e) => setSaveJd(e.target.checked)}
+              disabled={submitting}
+              className="h-3.5 w-3.5 rounded border-gray-300 text-[#4A90E2] accent-[#4A90E2]"
+            />
+            Save this JD to Positions
+          </label>
+        </div>
       </div>
 
-      <div>
-        <div className="flex items-baseline justify-between">
-          <label htmlFor="jdText" className="block text-sm font-medium text-gray-700">
-            Job description
-          </label>
-          <span className="text-xs text-gray-500">
-            {jdText.trim().length} chars · min {MIN_TEXT_LENGTH}
-          </span>
-        </div>
-        <textarea
-          id="jdText"
-          name="jdText"
-          rows={8}
-          value={jdText}
-          onChange={(e) => {
-            setJdText(e.target.value);
-            clearError("jdText");
-          }}
-          disabled={submitting}
-          aria-invalid={Boolean(fieldErrors.jdText)}
-          aria-describedby="jdText-error"
-          placeholder="Paste the job description here…"
-          className={`mt-1 resize-y ${fieldClass(Boolean(fieldErrors.jdText))}`}
-        />
-        <FieldError id="jdText-error" message={fieldErrors.jdText} />
-      </div>
-
-      <div className="flex items-center justify-end gap-3 pt-2">
+      <div className="flex items-center justify-end gap-3">
         <button
           type="submit"
           disabled={submitting}

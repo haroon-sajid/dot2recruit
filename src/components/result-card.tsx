@@ -141,7 +141,8 @@ export function ResultCard({ result }: { result: ScreeningResult }) {
         </div>
       </div>
 
-      <div className="grid gap-6 p-6 md:grid-cols-2">
+      {/* Six sections: two columns on tablet, three on wide screens so the row fills evenly. */}
+      <div className="grid gap-6 p-6 md:grid-cols-2 xl:grid-cols-3">
         <TextSection title="Relevant Experience" body={result.relevant_experience} />
         <TextSection title="Technical Skills Match" body={result.technical_skills_match} />
         <TextSection title="Education Match" body={result.education_match} />

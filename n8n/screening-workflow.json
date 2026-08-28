@@ -1,3 +1,275 @@
 {
-  "_comment": "n8n workflow export for the AI candidate screening pipeline (import into n8n)."
+  "name": "RecruitAI Screening",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "recruitai-screening",
+        "options": {}
+      },
+      "id": "76c82847-ff97-4405-911b-d76587f7ffee",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -544,
+        16
+      ],
+      "webhookId": "recruitai-screening"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.headers['x-webhook-secret'] }}",
+              "rightValue": "REPLACE_WITH_WEBHOOK_SECRET",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "ad16bd82-58bc-40c4-b8cf-42208ab6987d",
+      "name": "Verify Secret",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -368,
+        16
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const b = $('Webhook').item.json.body;\n\nif (!b || !b.candidateId || !b.cvText || !b.jdText) {\n  throw new Error('Missing required fields: candidateId, cvText, jdText');\n}\n\nconst system = `You are an expert HR recruitment screening assistant. Your job is to evaluate a candidate's CV against a specific Job Description (JD) and produce a structured, evidence-based assessment.\n\nSTRICT RULES:\n1. Base every statement ONLY on information explicitly present in the CV and JD. Never assume, infer, or invent skills, experience, or qualifications that are not written in the CV.\n2. If information is missing from the CV (for example education or a required skill), state that it is \"not mentioned in the CV\" instead of guessing.\n3. Separate facts from interpretation: when you assess fit, refer to the exact evidence in the CV that supports it.\n4. Evaluate the candidate ONLY against the provided JD, not against a generic idea of the role.\n5. Output MUST be valid JSON matching the exact schema below. No markdown, no code fences, no text before or after the JSON.\n\nSCORING GUIDE:\n- 90-100: meets nearly all requirements with strong evidence\n- 75-89: meets most core requirements\n- 50-74: meets some requirements, notable gaps\n- 25-49: limited overlap with requirements\n- 0-24: little to no relevant match\n\nDECISION RULES:\n- overall_score >= 75: \"strong_match\"\n- overall_score 50-74: \"potential_match\"\n- overall_score < 50: \"not_a_match\"\n- interview_recommended: true if overall_score >= 60, otherwise false\n\nOUTPUT SCHEMA (JSON only):\n{\n  \"overall_score\": <integer 0-100>,\n  \"relevant_experience\": \"<2-4 sentences, facts from CV relevant to JD>\",\n  \"technical_skills_match\": \"<2-4 sentences comparing CV skills to JD skills>\",\n  \"education_match\": \"<1-3 sentences, or state not mentioned in CV>\",\n  \"missing_skills\": [\"<JD requirement not evidenced in CV>\"],\n  \"strengths\": [\"<strength with CV evidence>\"],\n  \"concerns\": [\"<gap or risk based on CV vs JD>\"],\n  \"decision\": \"strong_match\" | \"potential_match\" | \"not_a_match\",\n  \"decision_reason\": \"<3-5 sentences explaining the decision, citing specific evidence from the CV and specific JD requirements>\"\n}`;\n\nconst user = 'JOB DESCRIPTION:\\n' + b.jdText + '\\n\\nCANDIDATE CV:\\n' + b.cvText + '\\n\\nPOSITION: ' + (b.position || 'Not specified') + '\\n\\nEvaluate this candidate now. Respond with JSON only.';\n\nreturn [{\n  json: {\n    model: 'gpt-4o-mini',\n    max_tokens: 2000,\n    temperature: 0,\n    response_format: { type: 'json_object' },\n    messages: [\n      { role: 'system', content: system },\n      { role: 'user', content: user }\n    ]\n  }\n}];"
+      },
+      "id": "943f1f4f-812b-4fb7-9ff9-3455ab6364a6",
+      "name": "Build AI Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -144,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer REPLACE_WITH_OPENAI_API_KEY"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "3dfbefb0-e85e-44d7-a7e1-b995ce79029b",
+      "name": "Call OpenAI",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        64,
+        0
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const text = ($json.choices && $json.choices[0] && $json.choices[0].message) ? $json.choices[0].message.content : '';\n\nif (!text) {\n  throw new Error('Empty response from AI');\n}\n\nconst clean = text.replace(/```json|```/g, '').trim();\nlet r;\ntry {\n  r = JSON.parse(clean);\n} catch (e) {\n  throw new Error('AI returned invalid JSON: ' + clean.slice(0, 200));\n}\n\nif (typeof r.overall_score !== 'number' || r.overall_score < 0 || r.overall_score > 100) {\n  throw new Error('Invalid overall_score: ' + r.overall_score);\n}\nr.overall_score = Math.round(r.overall_score);\n\nconst decisions = ['strong_match', 'potential_match', 'not_a_match'];\nif (!decisions.includes(r.decision)) {\n  throw new Error('Invalid decision: ' + r.decision);\n}\n\nif (!r.decision_reason || typeof r.decision_reason !== 'string') {\n  throw new Error('Missing decision_reason');\n}\n\nfor (const k of ['missing_skills', 'strengths', 'concerns']) {\n  if (!Array.isArray(r[k])) r[k] = [];\n  r[k] = r[k].map(String);\n}\n\nfor (const k of ['relevant_experience', 'technical_skills_match', 'education_match']) {\n  if (typeof r[k] !== 'string') r[k] = null;\n}\n\nif (typeof r.interview_recommended !== 'boolean') {\n  r.interview_recommended = r.overall_score >= 60;\n}\n\nreturn [{ json: r }];"
+      },
+      "id": "e7c96657-e96c-4c42-8a49-3dfd5a868db9",
+      "name": "Parse and Validate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        304,
+        -16
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://dot2recruit.vercel.app/api/webhook/result",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-webhook-secret",
+              "value": "REPLACE_WITH_WEBHOOK_SECRET"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ candidateId: $('Webhook').item.json.body.candidateId, result: $json }) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "4c3d78f4-0964-4ec7-9a9c-af0979152ee1",
+      "name": "Send Result",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        544,
+        -32
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://dot2recruit.vercel.app/api/webhook/result",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-webhook-secret",
+              "value": "REPLACE_WITH_WEBHOOK_SECRET"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ candidateId: $('Webhook').item.json.body.candidateId, result: null }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          },
+          "timeout": 15000
+        }
+      },
+      "id": "1ee49192-ccee-459c-8f5a-33d66dd5b927",
+      "name": "Mark Failed",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        544,
+        192
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Verify Secret",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Secret": {
+      "main": [
+        [
+          {
+            "node": "Build AI Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build AI Request": {
+      "main": [
+        [
+          {
+            "node": "Call OpenAI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse and Validate": {
+      "main": [
+        [
+          {
+            "node": "Send Result",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call OpenAI": {
+      "main": [
+        [
+          {
+            "node": "Parse and Validate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "e3c2cff2-928a-47a8-be3d-be1459c1ed4a",
+  "id": "L8z96hDW7ihYPirelxdJH",
+  "tags": []
 }

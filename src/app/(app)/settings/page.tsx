@@ -76,7 +76,7 @@ export default function SettingsPage() {
     <div className="space-y-6">
       <PageHeader title="Settings" subtitle="Your account and workspace details." />
 
-      <div className="max-w-2xl space-y-6">
+      <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <h2 className="text-sm font-semibold text-gray-900">Account</h2>
           {error ? (

@@ -59,6 +59,34 @@ export interface CandidateWithResult extends Candidate {
   screening_result: ScreeningResult | null;
 }
 
+/** Row in the `job_descriptions` table: a saved, reusable position. */
+export interface JobDescription {
+  id: string;
+  tenant_id: string;
+  title: string;
+  jd_text: string;
+  created_at: string;
+}
+
+/** Payload for creating a saved position. */
+export interface JobDescriptionInput {
+  title: string;
+  jd_text: string;
+}
+
+/** Best-effort fields detected in an uploaded CV. Any field may be null. */
+export interface DetectedFields {
+  name: string | null;
+  email: string | null;
+  position: string | null;
+}
+
+/** Body returned by POST /api/extract-text. */
+export interface ExtractTextResponse {
+  text: string;
+  detected: DetectedFields;
+}
+
 /** Body returned by GET /api/me for the signed-in user. */
 export interface MeResponse {
   email: string | null;

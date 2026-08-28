@@ -178,3 +178,32 @@ create policy "users read own tenant"
   for select
   to authenticated
   using (id in (select tenant_id from public.profiles where id = auth.uid()));
+
+
+-- ===========================================================================
+-- SAVED JOB DESCRIPTIONS
+-- Reusable job descriptions ("Positions") that HR saves once and reuses
+-- when screening candidates.
+-- ===========================================================================
+
+create table if not exists public.job_descriptions (
+  id          uuid primary key default gen_random_uuid(),
+  tenant_id   uuid not null references public.tenants (id),
+  title       text not null,
+  jd_text     text not null,
+  created_at  timestamptz default now()
+);
+
+create index if not exists job_descriptions_tenant_created_idx
+  on public.job_descriptions (tenant_id, created_at desc);
+
+-- Same access pattern as the other tables: server-side service role only.
+alter table public.job_descriptions enable row level security;
+
+drop policy if exists "service_role full access" on public.job_descriptions;
+create policy "service_role full access"
+  on public.job_descriptions
+  for all
+  to service_role
+  using (true)
+  with check (true);

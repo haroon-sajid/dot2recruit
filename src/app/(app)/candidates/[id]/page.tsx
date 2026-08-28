@@ -102,7 +102,7 @@ export default function CandidateDetailPage() {
 
   if (error) {
     return (
-      <div className="mx-auto max-w-3xl">
+      <div>
         <div className="rounded-xl border border-red-200 bg-white p-8 text-center shadow-[0_4px_20px_rgba(79,70,229,0.06)]">
           <p className="text-base font-semibold text-red-800">{error}</p>
           <div className="mt-4 flex justify-center gap-3">
@@ -129,7 +129,7 @@ export default function CandidateDetailPage() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-3">
