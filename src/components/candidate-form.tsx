@@ -573,6 +573,10 @@ export function CandidateForm() {
         </div>
       </div>
 
+      {/* Position and the saved-position picker share a row, mirroring the name
+          and email row above. Keeping the picker out of the job description
+          column is what lets the CV and JD columns line up. */}
+      <div className="grid gap-5 sm:grid-cols-2">
       <div>
         <label htmlFor="position" className="block text-sm font-medium text-gray-700">
           Position
@@ -618,6 +622,36 @@ export function CandidateForm() {
         )}
         <AutoFillHint show={autoFilled.position} />
         <FieldError id="position-error" message={fieldErrors.position} />
+      </div>
+
+        <div>
+          <label htmlFor="savedPosition" className="block text-sm font-medium text-gray-700">
+            Select saved position
+          </label>
+          <select
+            id="savedPosition"
+            value={selectedPositionId}
+            onChange={(e) => handleSelectPosition(e.target.value)}
+            disabled={submitting || positions.length === 0}
+            className={`mt-1 ${fieldClass(false)}`}
+          >
+            <option value="">
+              {positions.length === 0
+                ? "No saved positions yet"
+                : "None, upload or paste below…"}
+            </option>
+            {positions.map((saved) => (
+              <option key={saved.id} value={saved.id}>
+                {saved.title}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1 text-xs text-gray-500">
+            {positions.length === 0
+              ? "Save one from the Positions page to reuse it here."
+              : "Fills the job description and the position title."}
+          </p>
+        </div>
       </div>
 
       {/* CV and JD sit side by side on wide screens so they can be compared while pasting.
@@ -666,32 +700,6 @@ export function CandidateForm() {
               {jdText.trim().length} chars · min {MIN_TEXT_LENGTH}
             </span>
           </div>
-          {/* Three ways to provide the JD: pick a saved position, upload a file, or paste. */}
-          {positions.length > 0 && (
-            <div className="mt-1">
-              <label
-                htmlFor="savedPosition"
-                className="block text-xs font-medium text-gray-500"
-              >
-                Select saved position
-              </label>
-              <select
-                id="savedPosition"
-                value={selectedPositionId}
-                onChange={(e) => handleSelectPosition(e.target.value)}
-                disabled={submitting}
-                className={`mt-1 ${fieldClass(false)}`}
-              >
-                <option value="">None, upload or paste below…</option>
-                {positions.map((saved) => (
-                  <option key={saved.id} value={saved.id}>
-                    {saved.title}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
           <FileDrop
             label="the job description"
             disabled={submitting}

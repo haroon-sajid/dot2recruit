@@ -3,14 +3,12 @@
 
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { createBrowserSupabaseClient } from "@/lib/supabase-browser";
 
 const inputClass =
   "mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-[#4A90E2] focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/40 disabled:bg-gray-50";
 
 export default function LoginPage() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -33,8 +31,12 @@ export default function LoginPage() {
         setSubmitting(false);
         return;
       }
-      router.push("/dashboard");
-      router.refresh();
+      // Full page load rather than router.push: it guarantees the session
+      // cookies Supabase just wrote are sent with the request, so proxy.ts sees
+      // the new session. A client-side push can outrun cookie propagation and
+      // get bounced straight back to this page, leaving the button spinning.
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- deliberate: a soft navigation is what breaks auth here.
+      window.location.assign("/dashboard");
     } catch {
       setError("Could not reach the authentication service. Please try again.");
       setSubmitting(false);

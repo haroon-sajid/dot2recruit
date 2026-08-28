@@ -3,7 +3,6 @@
 
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { createBrowserSupabaseClient } from "@/lib/supabase-browser";
 
 const MIN_PASSWORD_LENGTH = 8;
@@ -12,7 +11,6 @@ const inputClass =
   "mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-[#4A90E2] focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/40 disabled:bg-gray-50";
 
 export default function SignupPage() {
-  const router = useRouter();
   const [fullName, setFullName] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [email, setEmail] = useState("");
@@ -50,8 +48,10 @@ export default function SignupPage() {
         return;
       }
       if (data.session) {
-        router.push("/dashboard");
-        router.refresh();
+        // Full page load so the new session cookies reach proxy.ts. See the
+        // same note on the login page.
+        // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- deliberate: a soft navigation is what breaks auth here.
+        window.location.assign("/dashboard");
         return;
       }
       // No session means email confirmation is enabled for the project.

@@ -2,7 +2,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import { createBrowserSupabaseClient } from "@/lib/supabase-browser";
 import type { MeResponse } from "@/types";
@@ -28,7 +27,6 @@ function Field({ label, value }: { label: string; value: string | null }) {
 }
 
 export default function SettingsPage() {
-  const router = useRouter();
   const [me, setMe] = useState<MeResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -68,8 +66,9 @@ export default function SettingsPage() {
     } catch (err) {
       console.error("[auth] Sign out failed:", err);
     }
-    router.push("/login");
-    router.refresh();
+    // Full page load so the cleared cookies reach the server.
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- deliberate: clears all client router state on sign out.
+    window.location.assign("/login");
   }
 
   return (

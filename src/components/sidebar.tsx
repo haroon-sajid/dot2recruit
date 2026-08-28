@@ -3,7 +3,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { createBrowserSupabaseClient } from "@/lib/supabase-browser";
 
@@ -306,7 +306,6 @@ export function Sidebar({
   onToggle: () => void;
 }) {
   const pathname = usePathname();
-  const router = useRouter();
   const [loggingOut, setLoggingOut] = useState(false);
 
   async function handleLogout() {
@@ -316,8 +315,10 @@ export function Sidebar({
     } catch (err) {
       console.error("[auth] Sign out failed:", err);
     }
-    router.push("/login");
-    router.refresh();
+    // Full page load so the cleared cookies reach the server and no stale
+    // session survives in the router cache.
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- deliberate: clears all client router state on sign out.
+    window.location.assign("/login");
   }
 
   const initial = email ? email.charAt(0).toUpperCase() : "U";
