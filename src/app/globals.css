@@ -3,10 +3,141 @@
 /* Light-only theme (dark mode intentionally not supported yet). */
 html {
   color-scheme: light;
+  scroll-behavior: smooth;
+}
+
+/* Dot2Recruit design tokens */
+:root {
+  /* Base palette */
+  --color-primary: #4A90E2;
+  --color-primary-hover: #3A7BD5;
+  --color-primary-light: #EBF3FC;
+  --color-success: #50C878;
+  --color-success-light: #E8F8EF;
+  --color-warning: #FFA500;
+  --color-warning-light: #FFF4E0;
+  --color-danger: #EF4444;
+  --color-danger-light: #FEE2E2;
+  --color-purple: #6B5CE7;
+  --color-purple-light: #EDE9FE;
+
+  /* Backgrounds */
+  --color-bg-start: #F5F7FF;
+  --color-bg-end: #E8EEFF;
+  --color-sidebar-bg: #FFFFFF;
+  --color-card-bg: #FFFFFF;
+  --color-card-shadow: rgba(74, 144, 226, 0.08);
+
+  /* Landing semantic tokens (extracted from existing brand) */
+  --color-accent: #4A90E2;
+  --color-accent-hover: #3A7BD5;
+  --color-accent-light: #EBF3FC;
+  --color-accent-soft: #F5F9FF;
+  --color-accent-ghost: rgba(74, 144, 226, 0.08);
+  --color-ink: #0F172A;
+  --color-slate: #334155;
+  --color-muted: #64748B;
+  --color-border: #E2E8F0;
+  --color-dark-surface: #111827;
+  --color-dark-border: rgba(255, 255, 255, 0.1);
 }
 
 @layer base {
   body {
-    @apply bg-gray-50 text-gray-900 antialiased;
+    background: linear-gradient(135deg, var(--color-bg-start) 0%, var(--color-bg-end) 100%);
+    background-attachment: fixed;
+    @apply text-gray-900 antialiased;
   }
+}
+
+@layer utilities {
+  .text-accent {
+    color: var(--color-accent);
+  }
+  .bg-accent {
+    background-color: var(--color-accent);
+  }
+  .bg-accent-hover:hover {
+    background-color: var(--color-accent-hover);
+  }
+  .bg-accent-light {
+    background-color: var(--color-accent-light);
+  }
+  .bg-accent-soft {
+    background-color: var(--color-accent-soft);
+  }
+  .bg-accent-ghost {
+    background-color: var(--color-accent-ghost);
+  }
+  .border-accent {
+    border-color: var(--color-accent);
+  }
+  .text-ink {
+    color: var(--color-ink);
+  }
+  .bg-ink {
+    background-color: var(--color-ink);
+  }
+  .text-muted {
+    color: var(--color-muted);
+  }
+  .border-landing {
+    border-color: var(--color-border);
+  }
+  .shadow-card {
+    box-shadow: 0 4px 24px var(--color-card-shadow);
+  }
+  .shadow-card-hover {
+    box-shadow: 0 12px 32px rgba(74, 144, 226, 0.12);
+  }
+  .hover-lift {
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+  }
+  .hover-lift:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 32px rgba(74, 144, 226, 0.12);
+  }
+  .reveal {
+    opacity: 0;
+    transform: translateY(24px);
+    transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+  }
+  .reveal-visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  .animate-float {
+    animation: float 5s ease-in-out infinite;
+  }
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
 }
