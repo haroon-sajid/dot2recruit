@@ -37,10 +37,10 @@ function Spinner() {
 }
 
 const inputClass =
-  "block w-full rounded-md border bg-white px-3 py-2 text-sm text-gray-900 shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-50 disabled:text-gray-500";
+  "block w-full rounded-lg border bg-white px-3 py-2.5 text-sm text-gray-900 shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/40 disabled:bg-gray-50 disabled:text-gray-500";
 
 function fieldClass(hasError: boolean) {
-  return `${inputClass} ${hasError ? "border-red-400 focus:border-red-500" : "border-gray-300 focus:border-indigo-500"}`;
+  return `${inputClass} ${hasError ? "border-red-300 focus:border-[#EF4444]" : "border-gray-200 focus:border-[#4A90E2]"}`;
 }
 
 function FieldError({ id, message }: { id: string; message?: string }) {
@@ -133,7 +133,7 @@ export function CandidateForm() {
       {apiError && (
         <div
           role="alert"
-          className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+          className="rounded-lg border border-red-100 bg-white px-4 py-3 text-sm text-red-800 shadow-[0_4px_20px_rgba(79,70,229,0.06)]"
         >
           <p className="font-medium">Submission failed</p>
           <p className="mt-0.5">{apiError}</p>
@@ -298,7 +298,7 @@ export function CandidateForm() {
         <button
           type="submit"
           disabled={submitting}
-          className="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex items-center gap-2 rounded-lg bg-[#4A90E2] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#3A7BD5] focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/40 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {submitting && <Spinner />}
           {submitting ? "Submitting…" : "Screen candidate"}

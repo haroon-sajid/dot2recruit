@@ -7,23 +7,23 @@ const STATUS_META: Record<
 > = {
   pending: {
     label: "Pending",
-    badge: "bg-gray-100 text-gray-700 ring-gray-500/20",
+    badge: "bg-gray-100 text-gray-600 ring-gray-200",
     dot: "bg-gray-400",
   },
   processing: {
     label: "Processing",
-    badge: "bg-blue-50 text-blue-700 ring-blue-600/20",
-    dot: "bg-blue-500 animate-pulse",
+    badge: "bg-[#EBF3FC] text-[#4A90E2] ring-[#4A90E2]/20",
+    dot: "bg-[#4A90E2] animate-pulse",
   },
   completed: {
     label: "Completed",
-    badge: "bg-green-50 text-green-700 ring-green-600/20",
-    dot: "bg-green-500",
+    badge: "bg-[#E8F8EF] text-[#2E8B57] ring-[#50C878]/20",
+    dot: "bg-[#50C878]",
   },
   failed: {
     label: "Failed",
-    badge: "bg-red-50 text-red-700 ring-red-600/20",
-    dot: "bg-red-500",
+    badge: "bg-[#FEE2E2] text-[#DC2626] ring-[#EF4444]/20",
+    dot: "bg-[#EF4444]",
   },
 };
 
