@@ -4,12 +4,9 @@ import { NextResponse } from "next/server";
 import { getTenantContext } from "@/lib/auth";
 import { detectFields } from "@/lib/extract-detect";
 import type { ExtractTextResponse } from "@/types";
-// Import the implementation directly to avoid the package's debug entry,
-// which reads a test file and crashes in Vercel's serverless environment.
-import pdfParse from "pdf-parse/lib/pdf-parse.js";
 
 export const dynamic = "force-dynamic";
-// pdf-parse and mammoth need Node APIs, so this route cannot run on the edge.
+// mammoth needs Node APIs, so this route cannot run on the edge.
 export const runtime = "nodejs";
 
 const MAX_BYTES = 5 * 1024 * 1024;
@@ -54,9 +51,12 @@ async function extract(file: File, kind: Kind): Promise<string> {
     return value;
   }
 
-  // pdf-parse v1 returns the full document text in the `text` property.
-  const result = await pdfParse(buffer);
-  return result.text;
+  // unpdf ships a serverless build of pdf.js. Unlike pdf-parse it has no dynamic
+  // requires and no bundled per-version pdf.js copies, which is what broke on Vercel.
+  const { extractText, getDocumentProxy } = await import("unpdf");
+  const pdf = await getDocumentProxy(new Uint8Array(buffer));
+  const { text } = await extractText(pdf, { mergePages: true });
+  return text;
 }
 
 /** POST /api/extract-text — multipart form-data with a single `file` field. */
