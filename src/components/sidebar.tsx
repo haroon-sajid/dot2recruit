@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { createBrowserSupabaseClient } from "@/lib/supabase-browser";
+import { signOutAndRedirect } from "@/lib/sign-out";
 
 // ── Icon components (inline SVGs, 20x20) ──────────────────────────────────────
 
@@ -310,15 +310,7 @@ export function Sidebar({
 
   async function handleLogout() {
     setLoggingOut(true);
-    try {
-      await createBrowserSupabaseClient().auth.signOut();
-    } catch (err) {
-      console.error("[auth] Sign out failed:", err);
-    }
-    // Full page load so the cleared cookies reach the server and no stale
-    // session survives in the router cache.
-    // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- deliberate: clears all client router state on sign out.
-    window.location.assign("/login");
+    await signOutAndRedirect();
   }
 
   const initial = email ? email.charAt(0).toUpperCase() : "U";

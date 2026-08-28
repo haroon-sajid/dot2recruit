@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/ui/page-header";
-import { createBrowserSupabaseClient } from "@/lib/supabase-browser";
+import { signOutAndRedirect } from "@/lib/sign-out";
 import type { MeResponse } from "@/types";
 
 function Card({ children }: { children: React.ReactNode }) {
@@ -61,14 +61,7 @@ export default function SettingsPage() {
 
   async function handleLogout() {
     setLoggingOut(true);
-    try {
-      await createBrowserSupabaseClient().auth.signOut();
-    } catch (err) {
-      console.error("[auth] Sign out failed:", err);
-    }
-    // Full page load so the cleared cookies reach the server.
-    // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- deliberate: clears all client router state on sign out.
-    window.location.assign("/login");
+    await signOutAndRedirect();
   }
 
   return (
