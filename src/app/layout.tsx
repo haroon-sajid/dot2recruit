@@ -17,7 +17,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={inter.variable}>
+    // data-scroll-behavior opts route transitions out of the global
+    // `scroll-behavior: smooth` in globals.css, so navigation jumps to the top
+    // instead of animating there.
+    <html lang="en" className={inter.variable} data-scroll-behavior="smooth">
       <body className={`flex min-h-screen flex-col font-sans`}>{children}</body>
     </html>
   );

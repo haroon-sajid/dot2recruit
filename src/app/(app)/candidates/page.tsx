@@ -41,12 +41,31 @@ function computeStats(candidates: CandidateWithResult[]) {
 function CandidateCard({
   candidate,
   onOpen,
+  onDeleted,
 }: {
   candidate: CandidateWithResult;
   onOpen: () => void;
+  onDeleted: (id: string) => void;
 }) {
   const result = candidate.screening_result;
   const decision = result ? DECISION_META[result.decision] : null;
+  const [confirming, setConfirming] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  async function remove() {
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/candidates/${candidate.id}`, { method: "DELETE" });
+      if (res.ok) {
+        onDeleted(candidate.id);
+        return;
+      }
+    } catch {
+      // Fall through and reset so the user can retry.
+    }
+    setDeleting(false);
+    setConfirming(false);
+  }
 
   return (
     <div className="flex flex-col rounded-xl border border-gray-100 bg-white p-5 shadow-[0_4px_20px_rgba(79,70,229,0.06)] transition hover:shadow-md">
@@ -84,13 +103,60 @@ function CandidateCard({
         Submitted {formatDate(candidate.created_at)}
       </p>
 
-      <button
-        type="button"
-        onClick={onOpen}
-        className="mt-3 w-full rounded-lg bg-white px-4 py-2 text-xs font-semibold text-[#4A90E2] shadow-sm ring-1 ring-inset ring-gray-200 transition hover:bg-[#EBF3FC] focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/40"
-      >
-        View details
-      </button>
+      {confirming ? (
+        <div className="mt-3 rounded-lg bg-red-50 p-3">
+          <p className="text-xs text-gray-700">
+            Delete {candidate.name} and their screening result?
+          </p>
+          <div className="mt-2 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={remove}
+              disabled={deleting}
+              className="rounded-lg bg-[#EF4444] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#DC2626] disabled:opacity-60"
+            >
+              {deleting ? "Deleting…" : "Delete"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirming(false)}
+              disabled={deleting}
+              className="rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-sm ring-1 ring-inset ring-gray-200 transition hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-3 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onOpen}
+            className="flex-1 rounded-lg bg-white px-4 py-2 text-xs font-semibold text-[#4A90E2] shadow-sm ring-1 ring-inset ring-gray-200 transition hover:bg-[#EBF3FC] focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/40"
+          >
+            View details
+          </button>
+          <button
+            type="button"
+            onClick={() => setConfirming(true)}
+            aria-label={`Delete ${candidate.name}`}
+            className="rounded-lg bg-white px-3 py-2 text-xs font-semibold text-gray-500 shadow-sm ring-1 ring-inset ring-gray-200 transition hover:bg-red-50 hover:text-[#DC2626]"
+          >
+            <svg
+              className="h-4 w-4"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <polyline points="3 6 5 6 21 6" />
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+            </svg>
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -179,7 +245,7 @@ export default function CandidatesPage() {
               href="/new-candidate"
               className="inline-flex items-center rounded-lg bg-[#4A90E2] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#3A7BD5]"
             >
-              + New Candidate
+              + Screen Candidate
             </Link>
           </div>
         </div>
@@ -190,12 +256,26 @@ export default function CandidatesPage() {
               key={candidate.id}
               candidate={candidate}
               onOpen={() => setOpenId(candidate.id)}
+              onDeleted={(id) =>
+                setCandidates((prev) => (prev ?? []).filter((c) => c.id !== id))
+              }
             />
           ))}
         </div>
       )}
 
-      {openId && <CandidateModal candidateId={openId} onClose={() => setOpenId(null)} />}
+      {openId && (
+        <CandidateModal
+          candidateId={openId}
+          onClose={() => setOpenId(null)}
+          onDeleted={(id) => setCandidates((prev) => (prev ?? []).filter((c) => c.id !== id))}
+          onUpdated={(updated) =>
+            setCandidates((prev) =>
+              (prev ?? []).map((c) => (c.id === updated.id ? updated : c)),
+            )
+          }
+        />
+      )}
     </div>
   );
 }

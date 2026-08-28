@@ -71,14 +71,25 @@ function TextSection({ title, body }: { title: string; body: string }) {
 export function CandidateModal({
   candidateId,
   onClose,
+  onDeleted,
+  onUpdated,
 }: {
   candidateId: string;
   onClose: () => void;
+  /** Called after the candidate is deleted, so the list can drop the row. */
+  onDeleted?: (id: string) => void;
+  /** Called after details are saved, so the list can show the new values. */
+  onUpdated?: (candidate: CandidateWithResult) => void;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const [candidate, setCandidate] = useState<CandidateWithResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [timedOut, setTimedOut] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [form, setForm] = useState({ name: "", email: "", position: "" });
 
   // Load, then keep polling while the screening is still running.
   useEffect(() => {
@@ -118,6 +129,61 @@ export function CandidateModal({
       if (timer) clearTimeout(timer);
     };
   }, [candidateId]);
+
+  function startEditing() {
+    if (!candidate) return;
+    setForm({ name: candidate.name, email: candidate.email, position: candidate.position });
+    setActionError(null);
+    setEditing(true);
+  }
+
+  async function saveDetails() {
+    setBusy(true);
+    setActionError(null);
+    try {
+      const res = await fetch(`/api/candidates/${candidateId}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => null)) as { error?: string } | null;
+        setActionError(data?.error ?? "Could not save these details.");
+        return;
+      }
+      const updated = candidate ? { ...candidate, ...form } : null;
+      if (updated) {
+        setCandidate(updated);
+        onUpdated?.(updated);
+      }
+      setEditing(false);
+    } catch {
+      setActionError("Could not reach the server. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function deleteCandidate() {
+    setBusy(true);
+    setActionError(null);
+    try {
+      const res = await fetch(`/api/candidates/${candidateId}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => null)) as { error?: string } | null;
+        setActionError(data?.error ?? "Could not delete this candidate.");
+        setBusy(false);
+        setConfirmingDelete(false);
+        return;
+      }
+      onDeleted?.(candidateId);
+      onClose();
+    } catch {
+      setActionError("Could not reach the server. Please try again.");
+      setBusy(false);
+      setConfirmingDelete(false);
+    }
+  }
 
   // Escape to close, Tab cycles inside the panel.
   const handleKeyDown = useCallback(
@@ -195,7 +261,7 @@ export function CandidateModal({
               </h2>
               {candidate && <StatusBadge status={candidate.status} />}
             </div>
-            {candidate && (
+            {candidate && !editing && (
               <p className="mt-1 text-sm text-gray-500">
                 {candidate.position} · {candidate.email}
               </p>
@@ -207,6 +273,24 @@ export function CandidateModal({
             )}
           </div>
           <div className="flex items-center gap-2">
+            {candidate && !editing && (
+              <>
+                <button
+                  type="button"
+                  onClick={startEditing}
+                  className="rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-sm ring-1 ring-inset ring-gray-200 transition hover:bg-[#EBF3FC] hover:text-[#4A90E2]"
+                >
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmingDelete(true)}
+                  className="rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-sm ring-1 ring-inset ring-gray-200 transition hover:bg-red-50 hover:text-[#DC2626]"
+                >
+                  Delete
+                </button>
+              </>
+            )}
             <Link
               href={`/candidates/${candidateId}`}
               className="rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-sm ring-1 ring-inset ring-gray-200 transition hover:bg-gray-50"
@@ -248,6 +332,89 @@ export function CandidateModal({
             </div>
           ) : (
             <>
+              {actionError && (
+                <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+                  {actionError}
+                </div>
+              )}
+
+              {confirmingDelete && (
+                <div className="rounded-xl border border-red-200 bg-white p-5">
+                  <p className="text-sm font-semibold text-gray-900">
+                    Delete {candidate.name}?
+                  </p>
+                  <p className="mt-1 text-sm text-gray-600">
+                    This removes the candidate and their screening result. It cannot be undone.
+                  </p>
+                  <div className="mt-4 flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={deleteCandidate}
+                      disabled={busy}
+                      className="rounded-lg bg-[#EF4444] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#DC2626] disabled:opacity-60"
+                    >
+                      {busy ? "Deleting…" : "Delete candidate"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmingDelete(false)}
+                      disabled={busy}
+                      className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm ring-1 ring-inset ring-gray-200 transition hover:bg-gray-50"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {editing && (
+                <div className="rounded-xl border border-gray-100 bg-white p-5">
+                  <h3 className="text-sm font-semibold text-gray-900">Edit details</h3>
+                  <p className="mt-0.5 text-xs text-gray-500">
+                    The CV and job description cannot be changed here. They are the inputs this
+                    screening result was produced from.
+                  </p>
+                  <div className="mt-4 grid gap-4 sm:grid-cols-3">
+                    {(["name", "email", "position"] as const).map((field) => (
+                      <div key={field}>
+                        <label
+                          htmlFor={`edit-${field}`}
+                          className="block text-xs font-medium capitalize text-gray-700"
+                        >
+                          {field}
+                        </label>
+                        <input
+                          id={`edit-${field}`}
+                          type={field === "email" ? "email" : "text"}
+                          value={form[field]}
+                          onChange={(e) => setForm((prev) => ({ ...prev, [field]: e.target.value }))}
+                          disabled={busy}
+                          className="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-[#4A90E2] focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/40 disabled:bg-gray-50"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-4 flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={saveDetails}
+                      disabled={busy}
+                      className="rounded-lg bg-[#4A90E2] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#3A7BD5] disabled:opacity-60"
+                    >
+                      {busy ? "Saving…" : "Save changes"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditing(false)}
+                      disabled={busy}
+                      className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm ring-1 ring-inset ring-gray-200 transition hover:bg-gray-50"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {candidate.status === "completed" &&
                 (candidate.screening_result ? (
                   <ResultCard result={candidate.screening_result} />

@@ -126,7 +126,7 @@ function useReveal() {
 
 const NAV_LINKS = [
   { href: "#features", label: "Features" },
-  { href: "/new-candidate", label: "New Candidate" },
+  { href: "/new-candidate", label: "Screen Candidate" },
   { href: "/candidates", label: "Candidates" },
   { href: "/analytics", label: "Reports" },
   { href: "#faq", label: "FAQ" },
@@ -293,7 +293,7 @@ const FOOTER_LINKS = [
     title: "Product",
     links: [
       { label: "Features", href: "#features" },
-      { label: "New Candidate", href: "/new-candidate" },
+      { label: "Screen Candidate", href: "/new-candidate" },
       { label: "Candidates", href: "/candidates" },
       { label: "Reports", href: "/analytics" },
     ],

@@ -1,5 +1,6 @@
 // Upload area used above the CV and job description textareas.
 // Handles the file picker, drag and drop, and the extraction request.
+// The selected file name is owned by the parent so it can be persisted and cleared.
 "use client";
 
 import { useId, useRef, useState, type DragEvent } from "react";
@@ -54,16 +55,21 @@ function Spinner() {
 export function FileDrop({
   label,
   disabled = false,
+  fileName,
   onExtracted,
+  onRemove,
 }: {
-  /** Describes the target field, used for the accessible button label. */
+  /** Describes the target field, used in the progress message. */
   label: string;
   disabled?: boolean;
-  onExtracted: (result: ExtractTextResponse) => void;
+  /** Name of the currently attached file, or null when there is none. */
+  fileName: string | null;
+  onExtracted: (result: ExtractTextResponse, fileName: string) => void;
+  /** Called when the user removes the attached file. */
+  onRemove: () => void;
 }) {
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
-  const [fileName, setFileName] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -84,8 +90,7 @@ export function FileDrop({
         return;
       }
 
-      setFileName(file.name);
-      onExtracted(data);
+      onExtracted(data, file.name);
     } catch {
       setError("Could not reach the server. Please paste the text instead.");
     } finally {
@@ -140,7 +145,7 @@ export function FileDrop({
           }`}
         >
           {busy ? <Spinner /> : <IconUpload />}
-          {busy ? "Reading file…" : "Upload PDF, DOCX or TXT"}
+          {busy ? "Reading file…" : fileName ? "Replace file" : "Upload PDF, DOCX or TXT"}
         </label>
 
         {busy ? (
@@ -152,10 +157,11 @@ export function FileDrop({
             <button
               type="button"
               onClick={() => {
-                setFileName(null);
                 setError(null);
+                onRemove();
               }}
               aria-label={`Remove ${fileName}`}
+              title="Remove this file and clear the text below"
               className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[#4A90E2] transition hover:bg-white"
             >
               <svg

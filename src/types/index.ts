@@ -59,6 +59,17 @@ export interface CandidateWithResult extends Candidate {
   screening_result: ScreeningResult | null;
 }
 
+/** Slim record of a prior screening for the same person and position. */
+export interface DuplicateCandidate {
+  id: string;
+  name: string;
+  position: string;
+  status: CandidateStatus;
+  created_at: string;
+  overall_score: number | null;
+  decision: Decision | null;
+}
+
 /** Row in the `job_descriptions` table: a saved, reusable position. */
 export interface JobDescription {
   id: string;

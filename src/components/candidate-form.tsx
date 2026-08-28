@@ -3,11 +3,17 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
 import { z } from "zod";
+import { DuplicateDialog } from "@/components/duplicate-dialog";
 import { FileDrop } from "@/components/file-drop";
-import { candidateInputSchema } from "@/lib/validations";
-import type { CandidateInput, ExtractTextResponse, JobDescription } from "@/types";
+import { ScreeningResultPanel } from "@/components/screening-result-panel";
+import { candidateInputSchema, type CandidateInputSchema } from "@/lib/validations";
+import type {
+  CandidateInput,
+  DuplicateCandidate,
+  ExtractTextResponse,
+  JobDescription,
+} from "@/types";
 
 const POSITION_OPTIONS = [
   "Full-Stack AI Automation Developer",
@@ -16,6 +22,58 @@ const POSITION_OPTIONS = [
 ] as const;
 const CUSTOM_POSITION = "__custom__";
 const MIN_TEXT_LENGTH = 50;
+
+// The in-progress form is kept in sessionStorage so a refresh does not throw away
+// extracted CV text. sessionStorage, not localStorage: a CV holds personal data,
+// and this way it lives only for the life of the tab and is cleared on submit.
+const DRAFT_KEY = "recruitai:screen-candidate-draft";
+
+interface Draft {
+  name: string;
+  email: string;
+  positionChoice: string;
+  customPosition: string;
+  cvText: string;
+  jdText: string;
+  cvFileName: string | null;
+  jdFileName: string | null;
+  selectedPositionId: string;
+  saveJd: boolean;
+}
+
+function readDraft(): Partial<Draft> | null {
+  try {
+    const raw = sessionStorage.getItem(DRAFT_KEY);
+    return raw ? (JSON.parse(raw) as Partial<Draft>) : null;
+  } catch {
+    // Storage can be unavailable or hold malformed JSON; start with a blank form.
+    return null;
+  }
+}
+
+function writeDraft(draft: Draft) {
+  try {
+    const isBlank =
+      !draft.name &&
+      !draft.email &&
+      !draft.positionChoice &&
+      !draft.customPosition &&
+      !draft.cvText &&
+      !draft.jdText;
+    if (isBlank) sessionStorage.removeItem(DRAFT_KEY);
+    else sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+  } catch {
+    // Persisting a draft is a convenience; never let it break the form.
+  }
+}
+
+function clearDraft() {
+  try {
+    sessionStorage.removeItem(DRAFT_KEY);
+  } catch {
+    // Nothing to do.
+  }
+}
 
 type FieldName = keyof CandidateInput;
 type FieldErrors = Partial<Record<FieldName, string>>;
@@ -80,7 +138,6 @@ function firstErrors(
 }
 
 export function CandidateForm() {
-  const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [positionChoice, setPositionChoice] = useState("");
@@ -95,9 +152,69 @@ export function CandidateForm() {
   const [positions, setPositions] = useState<JobDescription[]>([]);
   const [selectedPositionId, setSelectedPositionId] = useState("");
   const [saveJd, setSaveJd] = useState(false);
+  const [cvFileName, setCvFileName] = useState<string | null>(null);
+  const [jdFileName, setJdFileName] = useState<string | null>(null);
+  // Guards the save effect so the blank initial state cannot overwrite a stored draft.
+  const [restored, setRestored] = useState(false);
+  // Set once a screening has been created; the result renders under the form.
+  const [submittedId, setSubmittedId] = useState<string | null>(null);
+  // Prior screenings for the same person and position, awaiting confirmation.
+  const [duplicates, setDuplicates] = useState<DuplicateCandidate[] | null>(null);
+  const [checking, setChecking] = useState(false);
 
   const isCustom = positionChoice === CUSTOM_POSITION;
   const position = isCustom ? customPosition : positionChoice;
+
+  // Restore a draft left by a refresh. This has to run after mount: sessionStorage
+  // does not exist during SSR, and seeding it from a lazy useState initialiser
+  // would make the hydrated markup disagree with the server's. React batches these
+  // into a single render, so the cascading-render the rule warns about does not apply.
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    const draft = readDraft();
+    if (draft) {
+      if (draft.name) setName(draft.name);
+      if (draft.email) setEmail(draft.email);
+      if (draft.positionChoice) setPositionChoice(draft.positionChoice);
+      if (draft.customPosition) setCustomPosition(draft.customPosition);
+      if (draft.cvText) setCvText(draft.cvText);
+      if (draft.jdText) setJdText(draft.jdText);
+      if (draft.cvFileName) setCvFileName(draft.cvFileName);
+      if (draft.jdFileName) setJdFileName(draft.jdFileName);
+      if (draft.selectedPositionId) setSelectedPositionId(draft.selectedPositionId);
+      if (draft.saveJd) setSaveJd(draft.saveJd);
+    }
+    setRestored(true);
+  }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  useEffect(() => {
+    if (!restored) return;
+    writeDraft({
+      name,
+      email,
+      positionChoice,
+      customPosition,
+      cvText,
+      jdText,
+      cvFileName,
+      jdFileName,
+      selectedPositionId,
+      saveJd,
+    });
+  }, [
+    restored,
+    name,
+    email,
+    positionChoice,
+    customPosition,
+    cvText,
+    jdText,
+    cvFileName,
+    jdFileName,
+    selectedPositionId,
+    saveJd,
+  ]);
 
   // Saved positions for the "Select saved position" dropdown. A failure here
   // only hides the dropdown; uploading and pasting still work.
@@ -130,8 +247,9 @@ export function CandidateForm() {
    * Fill the CV text, then prefill name, email, and position from the detected
    * values. Only empty fields are touched, so anything already typed survives.
    */
-  function handleCvExtracted({ text, detected }: ExtractTextResponse) {
+  function handleCvExtracted({ text, detected }: ExtractTextResponse, fileName: string) {
     setCvText(text);
+    setCvFileName(fileName);
     clearError("cvText");
 
     const filled: AutoFilled = {};
@@ -156,11 +274,24 @@ export function CandidateForm() {
     setAutoFilled((prev) => ({ ...prev, ...filled }));
   }
 
-  function handleJdExtracted({ text }: ExtractTextResponse) {
+  function handleJdExtracted({ text }: ExtractTextResponse, fileName: string) {
     setJdText(text);
+    setJdFileName(fileName);
     clearError("jdText");
     // The text no longer matches the chosen saved position.
     setSelectedPositionId("");
+  }
+
+  /** Removing an attached file also clears the text it filled in. */
+  function removeCvFile() {
+    setCvFileName(null);
+    setCvText("");
+    setAutoFilled({});
+  }
+
+  function removeJdFile() {
+    setJdFileName(null);
+    setJdText("");
   }
 
   /**
@@ -175,6 +306,8 @@ export function CandidateForm() {
     if (!saved) return;
 
     setJdText(saved.jd_text);
+    // The text came from the dropdown, so any attached file no longer applies.
+    setJdFileName(null);
     clearError("jdText");
     // Saving it again would just duplicate the row.
     setSaveJd(false);
@@ -204,25 +337,17 @@ export function CandidateForm() {
     }
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  /** Creates the candidate and starts the screening. Called after any duplicate check. */
+  async function startScreening(input: CandidateInputSchema) {
     setApiError(null);
     setSavedId(null);
-
-    const input: CandidateInput = { name, email, position, cvText, jdText };
-    const parsed = candidateInputSchema.safeParse(input);
-    if (!parsed.success) {
-      setFieldErrors(firstErrors(z.flattenError(parsed.error).fieldErrors));
-      return;
-    }
-    setFieldErrors({});
     setSubmitting(true);
 
     try {
       const res = await fetch("/api/candidates", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(parsed.data),
+        body: JSON.stringify(input),
       });
       const data = (await res.json().catch(() => ({}))) as {
         id?: string;
@@ -232,10 +357,12 @@ export function CandidateForm() {
 
       if (res.status === 201 && data.id) {
         if (saveJd) {
-          await persistJobDescription(parsed.data.position, parsed.data.jdText);
+          await persistJobDescription(input.position, input.jdText);
         }
-        router.push(`/candidates/${data.id}`);
-        return; // keep the button disabled while navigating
+        // The candidate is stored server-side now; the local draft is no longer needed.
+        clearDraft();
+        setSubmittedId(data.id);
+        return;
       }
 
       if (res.status === 400 && data.fieldErrors) {
@@ -250,7 +377,70 @@ export function CandidateForm() {
     }
   }
 
+  /**
+   * Prior screenings of this person for this position. Returns an empty list on
+   * any failure, so a lookup problem never blocks a legitimate screening.
+   */
+  async function findDuplicates(email: string, position: string): Promise<DuplicateCandidate[]> {
+    try {
+      const query = new URLSearchParams({ email, position });
+      const res = await fetch(`/api/candidates/duplicates?${query}`, { cache: "no-store" });
+      if (!res.ok) return [];
+      const data = (await res.json()) as { candidates?: DuplicateCandidate[] };
+      return data.candidates ?? [];
+    } catch {
+      return [];
+    }
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setApiError(null);
+
+    const input: CandidateInput = { name, email, position, cvText, jdText };
+    const parsed = candidateInputSchema.safeParse(input);
+    if (!parsed.success) {
+      setFieldErrors(firstErrors(z.flattenError(parsed.error).fieldErrors));
+      return;
+    }
+    setFieldErrors({});
+
+    // Screening costs AI credits, so confirm before repeating one that already ran.
+    setChecking(true);
+    const existing = await findDuplicates(parsed.data.email, parsed.data.position);
+    setChecking(false);
+
+    if (existing.length > 0) {
+      setDuplicates(existing);
+      return;
+    }
+    await startScreening(parsed.data);
+  }
+
+  /** Reset back to a blank form for the next candidate. */
+  function screenAnother() {
+    setSubmittedId(null);
+    setName("");
+    setEmail("");
+    setPositionChoice("");
+    setCustomPosition("");
+    setCvText("");
+    setJdText("");
+    setCvFileName(null);
+    setJdFileName(null);
+    setSelectedPositionId("");
+    setSaveJd(false);
+    setAutoFilled({});
+    setFieldErrors({});
+    setApiError(null);
+    setSavedId(null);
+    clearDraft();
+  }
+
+  const busy = submitting || checking;
+
   return (
+    <>
     <form onSubmit={handleSubmit} noValidate className="space-y-5">
       {apiError && (
         <div
@@ -382,7 +572,13 @@ export function CandidateForm() {
               {cvText.trim().length} chars · min {MIN_TEXT_LENGTH}
             </span>
           </div>
-          <FileDrop label="the CV" disabled={submitting} onExtracted={handleCvExtracted} />
+          <FileDrop
+            label="the CV"
+            disabled={submitting}
+            fileName={cvFileName}
+            onExtracted={handleCvExtracted}
+            onRemove={removeCvFile}
+          />
           <textarea
             id="cvText"
             name="cvText"
@@ -438,7 +634,9 @@ export function CandidateForm() {
           <FileDrop
             label="the job description"
             disabled={submitting}
+            fileName={jdFileName}
             onExtracted={handleJdExtracted}
+            onRemove={removeJdFile}
           />
           <textarea
             id="jdText"
@@ -473,13 +671,40 @@ export function CandidateForm() {
       <div className="flex items-center justify-end gap-3">
         <button
           type="submit"
-          disabled={submitting}
+          disabled={busy}
           className="inline-flex items-center gap-2 rounded-lg bg-[#4A90E2] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#3A7BD5] focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/40 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {submitting && <Spinner />}
-          {submitting ? "Submitting…" : "Screen candidate"}
+          {busy && <Spinner />}
+          {checking ? "Checking…" : submitting ? "Submitting…" : "Screen candidate"}
         </button>
       </div>
     </form>
+
+    {submittedId && (
+      <div className="mt-6">
+        <ScreeningResultPanel candidateId={submittedId} onScreenAnother={screenAnother} />
+      </div>
+    )}
+
+    {duplicates && (
+      <DuplicateDialog
+        name={name.trim()}
+        position={position.trim()}
+        existing={duplicates}
+        onCancel={() => setDuplicates(null)}
+        onConfirm={() => {
+          setDuplicates(null);
+          const parsed = candidateInputSchema.safeParse({
+            name,
+            email,
+            position,
+            cvText,
+            jdText,
+          });
+          if (parsed.success) void startScreening(parsed.data);
+        }}
+      />
+    )}
+    </>
   );
 }

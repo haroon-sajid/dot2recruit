@@ -37,15 +37,19 @@ function Spinner() {
   );
 }
 
-function AddPositionForm({
+/** Create a position, or edit one when `existing` is given. */
+function PositionForm({
+  existing,
   onSaved,
   onCancel,
 }: {
-  onSaved: (created: JobDescription) => void;
+  existing: JobDescription | null;
+  onSaved: (saved: JobDescription) => void;
   onCancel: () => void;
 }) {
-  const [title, setTitle] = useState("");
-  const [jdText, setJdText] = useState("");
+  const [title, setTitle] = useState(existing?.title ?? "");
+  const [jdText, setJdText] = useState(existing?.jd_text ?? "");
+  const [fileName, setFileName] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -64,11 +68,14 @@ function AddPositionForm({
 
     setSaving(true);
     try {
-      const res = await fetch("/api/job-descriptions", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ title: title.trim(), jd_text: jdText.trim() }),
-      });
+      const res = await fetch(
+        existing ? `/api/job-descriptions/${existing.id}` : "/api/job-descriptions",
+        {
+          method: existing ? "PATCH" : "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ title: title.trim(), jd_text: jdText.trim() }),
+        },
+      );
       const data = (await res.json().catch(() => null)) as
         | (JobDescription & { error?: string })
         | null;
@@ -90,7 +97,9 @@ function AddPositionForm({
       onSubmit={handleSubmit}
       className="rounded-xl border border-gray-100 bg-white p-6 shadow-[0_4px_20px_rgba(79,70,229,0.06)]"
     >
-      <h2 className="text-sm font-semibold text-gray-900">Add a position</h2>
+      <h2 className="text-sm font-semibold text-gray-900">
+        {existing ? "Edit position" : "Add a position"}
+      </h2>
 
       {error && (
         <p role="alert" className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">
@@ -125,7 +134,15 @@ function AddPositionForm({
         <FileDrop
           label="the job description"
           disabled={saving}
-          onExtracted={({ text }) => setJdText(text)}
+          fileName={fileName}
+          onExtracted={({ text }, name) => {
+            setJdText(text);
+            setFileName(name);
+          }}
+          onRemove={() => {
+            setFileName(null);
+            setJdText("");
+          }}
         />
         <textarea
           id="jd-text"
@@ -152,7 +169,7 @@ function AddPositionForm({
           className="inline-flex items-center gap-2 rounded-lg bg-[#4A90E2] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#3A7BD5] disabled:cursor-not-allowed disabled:opacity-60"
         >
           {saving && <Spinner />}
-          {saving ? "Saving…" : "Save position"}
+          {saving ? "Saving…" : existing ? "Save changes" : "Save position"}
         </button>
       </div>
     </form>
@@ -161,9 +178,11 @@ function AddPositionForm({
 
 function PositionRow({
   position,
+  onEdit,
   onDelete,
 }: {
   position: JobDescription;
+  onEdit: () => void;
   onDelete: (id: string) => void;
 }) {
   const [confirming, setConfirming] = useState(false);
@@ -213,13 +232,22 @@ function PositionRow({
           </button>
         </div>
       ) : (
-        <button
-          type="button"
-          onClick={() => setConfirming(true)}
-          className="shrink-0 rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 shadow-sm ring-1 ring-inset ring-gray-200 transition hover:bg-red-50 hover:text-[#DC2626]"
-        >
-          Delete
-        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={onEdit}
+            className="rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 shadow-sm ring-1 ring-inset ring-gray-200 transition hover:bg-[#EBF3FC] hover:text-[#4A90E2]"
+          >
+            Edit
+          </button>
+          <button
+            type="button"
+            onClick={() => setConfirming(true)}
+            className="rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 shadow-sm ring-1 ring-inset ring-gray-200 transition hover:bg-red-50 hover:text-[#DC2626]"
+          >
+            Delete
+          </button>
+        </div>
       )}
     </div>
   );
@@ -229,6 +257,7 @@ export default function PositionsPage() {
   const [positions, setPositions] = useState<JobDescription[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState<JobDescription | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -262,7 +291,8 @@ export default function PositionsPage() {
         title="Positions"
         subtitle="Save a job description once and reuse it when screening candidates."
         action={
-          !adding && (
+          !adding &&
+          !editing && (
             <button
               type="button"
               onClick={() => setAdding(true)}
@@ -277,12 +307,24 @@ export default function PositionsPage() {
         }
       />
 
-      {adding && (
-        <AddPositionForm
-          onCancel={() => setAdding(false)}
-          onSaved={(created) => {
-            setPositions((prev) => [created, ...(prev ?? [])]);
+      {(adding || editing) && (
+        <PositionForm
+          // Remount when the target changes so the fields re-seed.
+          key={editing?.id ?? "new"}
+          existing={editing}
+          onCancel={() => {
             setAdding(false);
+            setEditing(null);
+          }}
+          onSaved={(saved) => {
+            setPositions((prev) => {
+              const list = prev ?? [];
+              return editing
+                ? list.map((p) => (p.id === saved.id ? saved : p))
+                : [saved, ...list];
+            });
+            setAdding(false);
+            setEditing(null);
           }}
         />
       )}
@@ -311,6 +353,10 @@ export default function PositionsPage() {
             <PositionRow
               key={position.id}
               position={position}
+              onEdit={() => {
+                setAdding(false);
+                setEditing(position);
+              }}
               onDelete={(id) =>
                 setPositions((prev) => (prev ?? []).filter((p) => p.id !== id))
               }

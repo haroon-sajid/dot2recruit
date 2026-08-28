@@ -12,6 +12,20 @@ export const candidateInputSchema = z.object({
 
 export type CandidateInputSchema = z.infer<typeof candidateInputSchema>;
 
+/**
+ * Editable candidate details. The CV and job description are deliberately not
+ * editable: they are the inputs the stored screening result was produced from,
+ * so changing them would leave the score describing text that no longer exists.
+ * Re-screen instead.
+ */
+export const candidateUpdateSchema = z.object({
+  name: z.string().trim().min(2, "Name must be at least 2 characters"),
+  email: z.email("Please enter a valid email address"),
+  position: z.string().trim().min(1, "Position is required"),
+});
+
+export type CandidateUpdateSchema = z.infer<typeof candidateUpdateSchema>;
+
 /** Body for POST /api/job-descriptions (a saved, reusable position). */
 export const jobDescriptionInputSchema = z.object({
   title: z.string().trim().min(2, "Title must be at least 2 characters"),

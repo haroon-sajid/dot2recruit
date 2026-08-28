@@ -130,7 +130,7 @@ export default function ReportsPage() {
               href="/new-candidate"
               className="inline-flex items-center rounded-lg bg-[#4A90E2] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#3A7BD5]"
             >
-              + New Candidate
+              + Screen Candidate
             </Link>
           </div>
         </div>
