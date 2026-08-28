@@ -1,13 +1,14 @@
 // Candidates dashboard: stats overview plus a card grid of all submitted candidates.
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { CandidateModal } from "@/components/candidate-modal";
 import { DECISION_META, scoreTone } from "@/components/result-card";
 import { StatusBadge } from "@/components/status-badge";
 import { MetricCard } from "@/components/ui/metric-card";
 import { PageHeader } from "@/components/ui/page-header";
+import { useCandidates } from "@/lib/use-candidates";
 import type { CandidateWithResult, ScreeningResult } from "@/types";
 
 function formatDate(iso: string) {
@@ -162,35 +163,10 @@ function CandidateCard({
 }
 
 export default function CandidatesPage() {
-  const [candidates, setCandidates] = useState<CandidateWithResult[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  // Shared hook: recovers from a back/forward-cache restore and times out a
+  // hung request instead of leaving the page on "Loading" forever.
+  const { candidates, setCandidates, error, reload } = useCandidates();
   const [openId, setOpenId] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      try {
-        const res = await fetch("/api/candidates", { cache: "no-store" });
-        const data = (await res.json().catch(() => null)) as
-          | { candidates?: CandidateWithResult[]; error?: string }
-          | null;
-        if (cancelled) return;
-        if (!res.ok || !data?.candidates) {
-          setError(data?.error ?? "Failed to load candidates.");
-          return;
-        }
-        setCandidates(data.candidates);
-      } catch {
-        if (!cancelled) {
-          setError("Could not reach the server. Check your connection and try again.");
-        }
-      }
-    }
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const stats = computeStats(candidates ?? []);
 
@@ -226,9 +202,16 @@ export default function CandidatesPage() {
       {error ? (
         <div
           role="alert"
-          className="rounded-xl border border-red-200 bg-red-50 p-6 text-sm text-red-800 shadow-[0_4px_20px_rgba(79,70,229,0.06)]"
+          className="rounded-xl border border-red-200 bg-red-50 p-6 shadow-[0_4px_20px_rgba(79,70,229,0.06)]"
         >
-          {error}
+          <p className="text-sm text-red-800">{error}</p>
+          <button
+            type="button"
+            onClick={reload}
+            className="mt-3 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm ring-1 ring-inset ring-gray-200 transition hover:bg-gray-50"
+          >
+            Try again
+          </button>
         </div>
       ) : candidates === null ? (
         <div className="rounded-xl border border-gray-100 bg-white p-12 text-center text-sm text-gray-500 shadow-[0_4px_20px_rgba(79,70,229,0.06)]">

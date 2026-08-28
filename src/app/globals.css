@@ -127,6 +127,79 @@ html {
   }
 }
 
+/* ---------------------------------------------------------------------------
+   Screening pipeline animations.
+   The workflow reports pending, processing, and completed only, so the running
+   state is deliberately indeterminate: it signals work in progress without
+   claiming a percentage the app cannot know.
+   --------------------------------------------------------------------------- */
+
+/* Pulsing halo on the stage currently running. */
+@keyframes pipeline-halo {
+  0% {
+    box-shadow: 0 0 0 0 rgba(74, 144, 226, 0.45);
+  }
+  70% {
+    box-shadow: 0 0 0 12px rgba(74, 144, 226, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(74, 144, 226, 0);
+  }
+}
+
+/* Light travelling along the connector between stages. */
+@keyframes pipeline-flow {
+  from {
+    background-position: 0% 0;
+  }
+  to {
+    background-position: 200% 0;
+  }
+}
+
+/* Staggered entrance for finished stages and the result card. */
+@keyframes pipeline-pop {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@layer utilities {
+  .animate-pipeline-halo {
+    animation: pipeline-halo 1.8s ease-out infinite;
+  }
+  .animate-pipeline-flow {
+    background-image: linear-gradient(
+      90deg,
+      var(--color-border) 0%,
+      var(--color-border) 35%,
+      var(--color-primary) 50%,
+      var(--color-border) 65%,
+      var(--color-border) 100%
+    );
+    background-size: 200% 100%;
+    animation: pipeline-flow 1.6s linear infinite;
+  }
+  .animate-pipeline-pop {
+    animation: pipeline-pop 0.45s ease-out both;
+  }
+}
+
+/* Respect a reduced-motion preference: keep the states, drop the movement. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-pipeline-halo,
+  .animate-pipeline-flow,
+  .animate-pipeline-pop,
+  .animate-float {
+    animation: none;
+  }
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 6px;

@@ -91,7 +91,7 @@ function BarRow({
 }
 
 export default function ReportsPage() {
-  const { candidates, error, loading } = useCandidates();
+  const { candidates, error, loading, reload } = useCandidates();
   const stats = computeStats(candidates ?? []);
 
   if (error) {
@@ -99,9 +99,16 @@ export default function ReportsPage() {
       <PageShell>
         <div
           role="alert"
-          className="rounded-xl border border-red-200 bg-red-50 p-6 text-sm text-red-800 shadow-[0_4px_20px_rgba(79,70,229,0.06)]"
+          className="rounded-xl border border-red-200 bg-red-50 p-6 shadow-[0_4px_20px_rgba(79,70,229,0.06)]"
         >
-          {error}
+          <p className="text-sm text-red-800">{error}</p>
+          <button
+            type="button"
+            onClick={reload}
+            className="mt-3 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm ring-1 ring-inset ring-gray-200 transition hover:bg-gray-50"
+          >
+            Try again
+          </button>
         </div>
       </PageShell>
     );

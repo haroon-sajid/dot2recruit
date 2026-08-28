@@ -244,8 +244,12 @@ export function CandidateForm() {
   }
 
   /**
-   * Fill the CV text, then prefill name, email, and position from the detected
-   * values. Only empty fields are touched, so anything already typed survives.
+   * Fill the CV text, then set name, email, and position from the detected values.
+   *
+   * Uploading a CV means "this is the candidate now", so a detected value replaces
+   * whatever is in the field. A value that is not detected clears the field only
+   * when the previous CV put it there; anything typed by hand is left alone, since
+   * silently deleting a person's own input is worse than leaving it stale.
    */
   function handleCvExtracted({ text, detected }: ExtractTextResponse, fileName: string) {
     setCvText(text);
@@ -254,24 +258,37 @@ export function CandidateForm() {
 
     const filled: AutoFilled = {};
 
-    if (detected.name && name.trim() === "") {
+    if (detected.name) {
       setName(detected.name);
       clearError("name");
       filled.name = true;
+    } else if (autoFilled.name) {
+      setName("");
     }
-    if (detected.email && email.trim() === "") {
+
+    if (detected.email) {
       setEmail(detected.email);
       clearError("email");
       filled.email = true;
-    }
-    if (detected.position && positionChoice === "" && customPosition.trim() === "") {
-      setPositionChoice(CUSTOM_POSITION);
-      setCustomPosition(detected.position);
-      clearError("position");
-      filled.position = true;
+    } else if (autoFilled.email) {
+      setEmail("");
     }
 
-    setAutoFilled((prev) => ({ ...prev, ...filled }));
+    if (detected.position) {
+      // Use the built-in option when the title matches one, otherwise Custom.
+      const known = POSITION_OPTIONS.find((option) => option === detected.position);
+      setPositionChoice(known ?? CUSTOM_POSITION);
+      setCustomPosition(known ? "" : detected.position);
+      clearError("position");
+      filled.position = true;
+      // The position no longer comes from the saved-position dropdown.
+      setSelectedPositionId("");
+    } else if (autoFilled.position) {
+      setPositionChoice("");
+      setCustomPosition("");
+    }
+
+    setAutoFilled({ ...filled });
   }
 
   function handleJdExtracted({ text }: ExtractTextResponse, fileName: string) {
@@ -282,10 +299,19 @@ export function CandidateForm() {
     setSelectedPositionId("");
   }
 
-  /** Removing an attached file also clears the text it filled in. */
+  /**
+   * Removing the CV clears its text and any field it auto-filled. Values typed
+   * by hand stay, for the same reason they survive a new upload.
+   */
   function removeCvFile() {
     setCvFileName(null);
     setCvText("");
+    if (autoFilled.name) setName("");
+    if (autoFilled.email) setEmail("");
+    if (autoFilled.position) {
+      setPositionChoice("");
+      setCustomPosition("");
+    }
     setAutoFilled({});
   }
 
@@ -417,9 +443,8 @@ export function CandidateForm() {
     await startScreening(parsed.data);
   }
 
-  /** Reset back to a blank form for the next candidate. */
-  function screenAnother() {
-    setSubmittedId(null);
+  /** Empty every field and drop the stored draft. */
+  function resetForm() {
     setName("");
     setEmail("");
     setPositionChoice("");
@@ -437,11 +462,47 @@ export function CandidateForm() {
     clearDraft();
   }
 
+  /** Reset back to a blank form for the next candidate. */
+  function screenAnother() {
+    setSubmittedId(null);
+    resetForm();
+  }
+
   const busy = submitting || checking;
+  const hasInput = Boolean(
+    name || email || positionChoice || customPosition || cvText || jdText,
+  );
 
   return (
     <>
     <form onSubmit={handleSubmit} noValidate className="space-y-5">
+      {hasInput && (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={resetForm}
+            disabled={busy}
+            title="Clear all fields"
+            aria-label="Clear all fields"
+            className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-gray-500 transition hover:bg-red-50 hover:text-[#DC2626] focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/40 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <svg
+              className="h-3.5 w-3.5"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <polyline points="3 6 5 6 21 6" />
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+            </svg>
+            Clear all
+          </button>
+        </div>
+      )}
+
       {apiError && (
         <div
           role="alert"

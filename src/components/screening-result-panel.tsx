@@ -1,8 +1,10 @@
 // Inline screening result shown under the form after a candidate is submitted.
 "use client";
 
+import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { ResultCard } from "@/components/result-card";
+import { ScreeningPipeline } from "@/components/screening-pipeline";
 import { StatusBadge } from "@/components/status-badge";
 import { isScreeningInProgress, useCandidate } from "@/lib/use-candidate";
 
@@ -23,11 +25,19 @@ export function ScreeningResultPanel({
   onScreenAnother: () => void;
 }) {
   const { candidate, error, timedOut } = useCandidate(candidateId);
+  const sectionRef = useRef<HTMLElement>(null);
+
+  // Bring the panel into view when a screening starts, so the click has a
+  // visible result instead of the work happening silently below the fold.
+  useEffect(() => {
+    sectionRef.current?.scrollIntoView({ block: "start" });
+  }, [candidateId]);
 
   return (
     <section
+      ref={sectionRef}
       aria-live="polite"
-      className="rounded-xl border border-gray-100 bg-white p-6 shadow-[0_4px_20px_rgba(79,70,229,0.06)]"
+      className="scroll-mt-6 rounded-xl border border-gray-100 bg-white p-6 shadow-[0_4px_20px_rgba(79,70,229,0.06)]"
     >
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
@@ -60,48 +70,54 @@ export function ScreeningResultPanel({
         </div>
       </div>
 
-      <div className="mt-5">
+      <div className="mt-5 space-y-5">
         {error ? (
           <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-6 text-sm text-red-800">
             {error}
           </div>
         ) : !candidate ? (
           <div className="flex items-center justify-center gap-2 py-10 text-sm text-gray-500">
-            <Spinner className="h-5 w-5" /> Loading result…
-          </div>
-        ) : candidate.status === "completed" ? (
-          candidate.screening_result ? (
-            <ResultCard result={candidate.screening_result} />
-          ) : (
-            <div className="rounded-xl border border-yellow-100 bg-white p-6 text-sm text-yellow-800">
-              Screening is marked complete but no result was recorded.
-            </div>
-          )
-        ) : candidate.status === "failed" ? (
-          <div className="rounded-xl border border-red-100 bg-white p-6">
-            <p className="text-base font-semibold text-red-800">Screening failed</p>
-            <p className="mt-1 text-sm text-gray-600">
-              The screening workflow could not complete for this candidate. You can submit it again.
-            </p>
-          </div>
-        ) : isScreeningInProgress(candidate.status) && timedOut ? (
-          <div className="rounded-xl border border-yellow-100 bg-white p-6">
-            <p className="text-base font-semibold text-gray-900">
-              This is taking longer than expected
-            </p>
-            <p className="mt-1 text-sm text-gray-500">
-              We stopped checking after 3 minutes. The screening may still finish. Open the full
-              page in a moment to check again.
-            </p>
+            <Spinner className="h-5 w-5" /> Starting screening…
           </div>
         ) : (
-          <div className="rounded-xl border border-blue-100 bg-white p-8 text-center">
-            <Spinner className="mx-auto h-8 w-8 text-[#4A90E2]" />
-            <p className="mt-4 text-base font-semibold text-gray-900">Screening in progress</p>
-            <p className="mt-1 text-sm text-gray-500">
-              Our AI is reviewing the CV against the job description. This updates automatically.
-            </p>
-          </div>
+          <>
+            {/* The workflow view stays visible after completion so the run reads
+                as a finished pipeline rather than the steps vanishing. */}
+            <ScreeningPipeline status={candidate.status} />
+
+            {candidate.status === "completed" &&
+              (candidate.screening_result ? (
+                <div className="animate-pipeline-pop">
+                  <ResultCard result={candidate.screening_result} />
+                </div>
+              ) : (
+                <div className="rounded-xl border border-yellow-100 bg-white p-6 text-sm text-yellow-800">
+                  Screening is marked complete but no result was recorded.
+                </div>
+              ))}
+
+            {candidate.status === "failed" && (
+              <div className="rounded-xl border border-red-100 bg-white p-6">
+                <p className="text-base font-semibold text-red-800">Screening failed</p>
+                <p className="mt-1 text-sm text-gray-600">
+                  The screening workflow could not complete for this candidate. You can submit it
+                  again.
+                </p>
+              </div>
+            )}
+
+            {isScreeningInProgress(candidate.status) && timedOut && (
+              <div className="rounded-xl border border-yellow-100 bg-white p-6">
+                <p className="text-base font-semibold text-gray-900">
+                  This is taking longer than expected
+                </p>
+                <p className="mt-1 text-sm text-gray-500">
+                  We stopped checking after 3 minutes. The screening may still finish. Open the
+                  full page in a moment to check again.
+                </p>
+              </div>
+            )}
+          </>
         )}
       </div>
     </section>
