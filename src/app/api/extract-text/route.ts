@@ -4,6 +4,9 @@ import { NextResponse } from "next/server";
 import { getTenantContext } from "@/lib/auth";
 import { detectFields } from "@/lib/extract-detect";
 import type { ExtractTextResponse } from "@/types";
+// Import the implementation directly to avoid the package's debug entry,
+// which reads a test file and crashes in Vercel's serverless environment.
+import pdfParse from "pdf-parse/lib/pdf-parse.js";
 
 export const dynamic = "force-dynamic";
 // pdf-parse and mammoth need Node APIs, so this route cannot run on the edge.
@@ -51,17 +54,9 @@ async function extract(file: File, kind: Kind): Promise<string> {
     return value;
   }
 
-  // pdf-parse v2 exposes a PDFParse class; getText() returns the whole document.
-  // pageJoiner defaults to a "-- 1 of 2 --" marker between pages, which would end
-  // up in the CV text sent to the model. An empty string turns it off.
-  const { PDFParse } = await import("pdf-parse");
-  const parser = new PDFParse({ data: new Uint8Array(buffer) });
-  try {
-    const result = await parser.getText({ pageJoiner: "" });
-    return result.text;
-  } finally {
-    await parser.destroy();
-  }
+  // pdf-parse v1 returns the full document text in the `text` property.
+  const result = await pdfParse(buffer);
+  return result.text;
 }
 
 /** POST /api/extract-text — multipart form-data with a single `file` field. */

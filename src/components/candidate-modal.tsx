@@ -235,22 +235,24 @@ export function CandidateModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-gray-900/40 p-4 backdrop-blur-sm sm:p-6"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 p-4 backdrop-blur-sm sm:p-6"
       onMouseDown={(event) => {
         // Only close when the press starts on the backdrop itself.
         if (event.target === event.currentTarget) onClose();
       }}
     >
+      {/* Capped to the viewport with the header pinned, so only the body scrolls
+          and the actions stay reachable. */}
       <div
         ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="candidate-modal-title"
         tabIndex={-1}
-        className="my-4 w-full max-w-4xl rounded-xl bg-[#F5F7FF] shadow-[0_20px_60px_rgba(15,23,42,0.25)] outline-none"
+        className="flex max-h-[92vh] w-full max-w-6xl flex-col rounded-xl bg-[#F5F7FF] shadow-[0_20px_60px_rgba(15,23,42,0.25)] outline-none"
       >
         {/* Header */}
-        <div className="flex flex-wrap items-start justify-between gap-4 rounded-t-xl border-b border-gray-100 bg-white px-6 py-5">
+        <div className="flex shrink-0 flex-wrap items-start justify-between gap-4 rounded-t-xl border-b border-gray-100 bg-white px-6 py-5">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-3">
               <h2
@@ -318,7 +320,7 @@ export function CandidateModal({
         </div>
 
         {/* Body */}
-        <div className="space-y-5 p-6">
+        <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-6">
           {error ? (
             <div
               role="alert"
@@ -460,8 +462,12 @@ export function CandidateModal({
                 </div>
               )}
 
-              <TextSection title="CV text" body={candidate.cv_text} />
-              <TextSection title="Job description" body={candidate.jd_text} />
+              {/* Side by side on wide screens so the source documents cost one
+                  row of height rather than two. */}
+              <div className="grid gap-5 lg:grid-cols-2">
+                <TextSection title="CV text" body={candidate.cv_text} />
+                <TextSection title="Job description" body={candidate.jd_text} />
+              </div>
             </>
           )}
         </div>
