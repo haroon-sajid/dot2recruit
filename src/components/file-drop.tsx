@@ -82,11 +82,16 @@ export function FileDrop({
       body.append("file", file);
       const res = await fetch("/api/extract-text", { method: "POST", body });
       const data = (await res.json().catch(() => null)) as
-        | (ExtractTextResponse & { error?: string })
+        | (ExtractTextResponse & { error?: string; detail?: string })
         | null;
 
       if (!res.ok || !data?.text) {
-        setError(data?.error ?? "Could not read this file. Please paste the text instead.");
+        const base =
+          data?.error ??
+          (res.status === 504
+            ? "The server took too long to read this file."
+            : `Upload failed (${res.status}). Please paste the text instead.`);
+        setError(data?.detail ? `${base} (${data.detail})` : base);
         return;
       }
 

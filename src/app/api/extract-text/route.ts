@@ -104,8 +104,15 @@ export async function POST(request: Request) {
       raw = await extract(file, kind);
     } catch (err) {
       console.error(`[api/extract-text] ${kind} extraction failed:`, err);
+      // The parser's own message is included so a deployment-specific failure
+      // (a missing module, an unsupported runtime) is visible without digging
+      // through server logs. It carries no secrets, only the library's error.
+      const detail = err instanceof Error ? err.message.slice(0, 200) : String(err).slice(0, 200);
       return NextResponse.json(
-        { error: "Could not read this file. It may be corrupt or password protected." },
+        {
+          error: "Could not read this file. It may be corrupt or password protected.",
+          detail: `${kind}: ${detail}`,
+        },
         { status: 400 },
       );
     }
