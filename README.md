@@ -1,4 +1,4 @@
-# RecruitAI
+# Dot2Recruit
 
 Live demo: https://dot2recruit.vercel.app
 
