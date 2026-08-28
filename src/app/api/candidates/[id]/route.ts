@@ -1,7 +1,8 @@
-// API route: fetch a single candidate with its screening result (polled by the result page).
+// API route: fetch one of the signed-in user's tenant candidates with its screening result (polled by the result page).
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { DEFAULT_TENANT_ID, supabaseAdmin } from "@/lib/supabase";
+import { getTenantContext } from "@/lib/auth";
+import { supabaseAdmin } from "@/lib/supabase";
 import type { Candidate, CandidateWithResult, ScreeningResult } from "@/types";
 
 // Always hit the database; never prerender or cache this route.
@@ -9,12 +10,17 @@ export const dynamic = "force-dynamic";
 
 type CandidateJoinRow = Candidate & { screening_results: ScreeningResult[] | null };
 
-/** GET /api/candidates/[id] — one candidate with its latest screening result. */
+/** GET /api/candidates/[id] — one candidate with its latest screening result; 404 if not in the user's tenant. */
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    const ctx = await getTenantContext();
+    if (!ctx) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { id } = await params;
     if (!z.uuid().safeParse(id).success) {
       return NextResponse.json({ error: "Invalid candidate id" }, { status: 400 });
@@ -24,7 +30,7 @@ export async function GET(
       .from("candidates")
       .select("*, screening_results(*)")
       .eq("id", id)
-      .eq("tenant_id", DEFAULT_TENANT_ID)
+      .eq("tenant_id", ctx.tenantId)
       .order("created_at", { referencedTable: "screening_results", ascending: false })
       .maybeSingle();
 

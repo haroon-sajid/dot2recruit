@@ -1,7 +1,8 @@
-// API route: create/list candidates and trigger the n8n screening workflow.
+// API route: create/list the signed-in user's tenant candidates and trigger the n8n screening workflow.
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { DEFAULT_TENANT_ID, supabaseAdmin } from "@/lib/supabase";
+import { getTenantContext } from "@/lib/auth";
+import { supabaseAdmin } from "@/lib/supabase";
 import { triggerScreening } from "@/lib/n8n";
 import { candidateInputSchema } from "@/lib/validations";
 import type {
@@ -31,9 +32,14 @@ async function setCandidateStatus(id: string, status: CandidateStatus) {
   }
 }
 
-/** POST /api/candidates — create a candidate and kick off screening. */
+/** POST /api/candidates — create a candidate in the user's tenant and kick off screening. */
 export async function POST(request: Request) {
   try {
+    const ctx = await getTenantContext();
+    if (!ctx) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     let body: unknown;
     try {
       body = await request.json();
@@ -53,7 +59,7 @@ export async function POST(request: Request) {
     const { data: inserted, error: insertError } = await supabaseAdmin
       .from("candidates")
       .insert({
-        tenant_id: DEFAULT_TENANT_ID,
+        tenant_id: ctx.tenantId,
         name: input.name,
         email: input.email,
         position: input.position,
@@ -76,7 +82,7 @@ export async function POST(request: Request) {
         cvText: input.cvText,
         jdText: input.jdText,
         position: input.position,
-        tenantId: DEFAULT_TENANT_ID,
+        tenantId: ctx.tenantId,
       });
     } catch (err) {
       console.error(`[api/candidates] Screening trigger failed for ${id}:`, err);
@@ -95,13 +101,18 @@ export async function POST(request: Request) {
   }
 }
 
-/** GET /api/candidates — all candidates (newest first) with their screening result. */
+/** GET /api/candidates — the user's tenant candidates (newest first) with their screening result. */
 export async function GET() {
   try {
+    const ctx = await getTenantContext();
+    if (!ctx) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { data, error } = await supabaseAdmin
       .from("candidates")
       .select("*, screening_results(*)")
-      .eq("tenant_id", DEFAULT_TENANT_ID)
+      .eq("tenant_id", ctx.tenantId)
       .order("created_at", { ascending: false })
       .order("created_at", { referencedTable: "screening_results", ascending: false });
 

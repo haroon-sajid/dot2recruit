@@ -7,6 +7,21 @@ export type Decision = "strong_match" | "potential_match" | "not_a_match";
 
 export type ApprovalStatus = "pending_review" | "approved" | "rejected";
 
+/** Row in the `tenants` table. */
+export interface Tenant {
+  id: string;
+  name: string;
+  created_at: string;
+}
+
+/** Row in the `profiles` table (one per auth user). */
+export interface Profile {
+  id: string;
+  tenant_id: string;
+  full_name: string | null;
+  created_at: string;
+}
+
 /** Row in the `candidates` table. */
 export interface Candidate {
   id: string;
@@ -42,6 +57,13 @@ export interface ScreeningResult {
 /** Candidate with its (latest) screening result, as returned by the API. */
 export interface CandidateWithResult extends Candidate {
   screening_result: ScreeningResult | null;
+}
+
+/** Body returned by GET /api/me for the signed-in user. */
+export interface MeResponse {
+  email: string | null;
+  fullName: string | null;
+  companyName: string | null;
 }
 
 /** Payload submitted from the candidate form (camelCase, pre-insert). */
