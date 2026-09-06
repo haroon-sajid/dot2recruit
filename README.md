@@ -122,7 +122,7 @@ These are configuration steps outside the code. Without them, parts of the app w
 1. **Custom SMTP for auth emails.** Supabase's built-in mailer allows only a few messages per hour, so signups and password resets fail with a rate-limit error once that is spent. In the Supabase dashboard go to Authentication, then SMTP Settings, enable a custom provider (for example Resend, Postmark or Amazon SES), and raise the email rate limit under Authentication, then Rate Limits.
 2. **Redirect URLs.** Under Authentication, then URL Configuration, set the Site URL to your deployed URL and add `https://<your-domain>/auth/callback` (and `http://localhost:3000/auth/callback` for local work) to the Redirect URLs list. Signup confirmation and password reset links return through this route.
 3. **Email templates.** The default Supabase templates work as they are. If you customise them, keep `{{ .ConfirmationURL }}` so the link carries the code that `/auth/callback` exchanges for a session.
-4. **Cron secret.** Set `CRON_SECRET` in the Vercel project. The schedule in `vercel.json` runs `/api/cron/reap-stale` every 10 minutes. The read endpoints also sweep stale screenings lazily, so this only matters for tenants nobody is looking at.
+4. **Cron secret.** Set `CRON_SECRET` in the Vercel project. The schedule in `vercel.json` runs `/api/cron/reap-stale` once a day at 03:00 UTC, the most a Hobby plan allows (Pro plans can run it more often). The read endpoints also sweep stale screenings lazily on every request, so the cron only matters for tenants nobody is looking at.
 5. **Function duration.** The candidate submit route waits up to 15 seconds for n8n. Make sure the project's function maximum duration is above that.
 
 ## 5. API Configuration

@@ -1,6 +1,7 @@
 // Cron route: fails screenings that never reported back, across all tenants.
-// Vercel calls it on the schedule in vercel.json with `Authorization: Bearer $CRON_SECRET`.
-// The read endpoints also sweep lazily, so this only matters for tenants nobody is looking at.
+// Vercel calls it on the schedule in vercel.json (daily; Hobby plans allow no more)
+// with `Authorization: Bearer $CRON_SECRET`. The read endpoints also sweep lazily
+// on every request, so this only matters for tenants nobody is looking at.
 import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { failStaleScreenings } from "@/lib/stale";
