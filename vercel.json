@@ -1,0 +1,5 @@
+{
+  "crons": [
+    { "path": "/api/cron/reap-stale", "schedule": "*/10 * * * *" }
+  ]
+}

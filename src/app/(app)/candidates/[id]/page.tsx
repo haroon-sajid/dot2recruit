@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { ResultCard } from "@/components/result-card";
 import { StatusBadge } from "@/components/status-badge";
+import { handleSessionExpired } from "@/lib/session";
 import type { CandidateWithResult } from "@/types";
 
 const POLL_INTERVAL_MS = 3_000;
@@ -63,6 +64,7 @@ export default function CandidateDetailPage() {
       try {
         const res = await fetch(`/api/candidates/${id}`, { cache: "no-store" });
         if (cancelled) return;
+        if (handleSessionExpired(res)) return;
 
         if (res.status === 404) {
           setError("Candidate not found.");
@@ -159,9 +161,15 @@ export default function CandidateDetailPage() {
           <p className="text-base font-semibold text-red-800">Screening failed</p>
           <p className="mt-1 text-sm text-gray-600">
             The screening workflow could not complete for this candidate. You can submit the
-            candidate again from the home page.
+            candidate again from Screen Candidate.
           </p>
-          <div className="mt-4">
+          <div className="mt-4 flex flex-wrap gap-3">
+            <Link
+              href="/new-candidate"
+              className="inline-flex items-center rounded-lg bg-[#4A90E2] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#3A7BD5]"
+            >
+              Screen candidate again
+            </Link>
             <BackLink />
           </div>
         </div>

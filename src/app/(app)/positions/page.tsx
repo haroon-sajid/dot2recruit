@@ -4,6 +4,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { FileDrop } from "@/components/file-drop";
 import { PageHeader } from "@/components/ui/page-header";
+import { handleSessionExpired } from "@/lib/session";
 import type { JobDescription } from "@/types";
 
 const PREVIEW_LENGTH = 120;
@@ -76,6 +77,7 @@ function PositionForm({
           body: JSON.stringify({ title: title.trim(), jd_text: jdText.trim() }),
         },
       );
+      if (handleSessionExpired(res)) return;
       const data = (await res.json().catch(() => null)) as
         | (JobDescription & { error?: string })
         | null;
@@ -192,6 +194,7 @@ function PositionRow({
     setDeleting(true);
     try {
       const res = await fetch(`/api/job-descriptions/${position.id}`, { method: "DELETE" });
+      if (handleSessionExpired(res)) return;
       if (res.ok) {
         onDelete(position.id);
         return;
@@ -264,6 +267,8 @@ export default function PositionsPage() {
     async function load() {
       try {
         const res = await fetch("/api/job-descriptions", { cache: "no-store" });
+        if (cancelled) return;
+        if (handleSessionExpired(res)) return;
         const data = (await res.json().catch(() => null)) as
           | { jobDescriptions?: JobDescription[]; error?: string }
           | null;

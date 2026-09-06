@@ -9,7 +9,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { MetricCard } from "@/components/ui/metric-card";
 import { computeStats, percentOf, STATUSES } from "@/lib/candidate-stats";
 import { useCandidates } from "@/lib/use-candidates";
-import type { CandidateStatus, CandidateWithResult, MeResponse } from "@/types";
+import type { CandidateListItem, CandidateStatus, MeResponse } from "@/types";
 
 const RECENT_LIMIT = 5;
 const TOP_LIMIT = 3;
@@ -89,7 +89,7 @@ function useFirstName(): string | null {
 }
 
 /** Highest-scoring screened candidates, best first. */
-function topScored(candidates: CandidateWithResult[]) {
+function topScored(candidates: CandidateListItem[]) {
   return candidates
     .filter((c) => c.screening_result !== null)
     .sort((a, b) => b.screening_result!.overall_score - a.screening_result!.overall_score)

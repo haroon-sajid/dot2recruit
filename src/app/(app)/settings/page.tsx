@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/ui/page-header";
+import { handleSessionExpired } from "@/lib/session";
 import { signOutAndRedirect } from "@/lib/sign-out";
 import type { MeResponse } from "@/types";
 
@@ -37,6 +38,8 @@ export default function SettingsPage() {
     async function load() {
       try {
         const res = await fetch("/api/me", { cache: "no-store" });
+        if (cancelled) return;
+        if (handleSessionExpired(res)) return;
         const data = (await res.json().catch(() => null)) as
           | (MeResponse & { error?: string })
           | null;
@@ -89,7 +92,7 @@ export default function SettingsPage() {
         <Card>
           <h2 className="text-sm font-semibold text-gray-900">Session</h2>
           <p className="mt-1 text-sm text-gray-500">
-            Sign out of Dot2Recruit on this device.
+            Sign out of Dot2Recruit. This ends your session on every device you are signed in on.
           </p>
           <button
             type="button"

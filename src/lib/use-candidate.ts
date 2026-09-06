@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { handleSessionExpired } from "@/lib/session";
 import type { CandidateWithResult } from "@/types";
 
 const POLL_INTERVAL_MS = 3_000;
@@ -45,6 +46,7 @@ export function useCandidate(candidateId: string): UseCandidateResult {
       try {
         const res = await fetch(`/api/candidates/${candidateId}`, { cache: "no-store" });
         if (cancelled) return;
+        if (handleSessionExpired(res)) return;
 
         if (!res.ok) {
           const data = (await res.json().catch(() => null)) as { error?: string } | null;

@@ -1,23 +1,41 @@
 // Login page: email + password sign-in.
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
+import { authErrorMessage } from "@/lib/auth-errors";
 import { createBrowserSupabaseClient } from "@/lib/supabase-browser";
 
 const inputClass =
   "mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-[#4A90E2] focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/40 disabled:bg-gray-50";
+
+// Why the user landed here, from the `reason` query parameter.
+const NOTICES: Record<string, string> = {
+  expired: "Your session ended. Please sign in again.",
+  password_updated: "Your password has been updated. Sign in with the new one.",
+  link_invalid: "That link is no longer valid. Request a new one below if you were resetting your password.",
+};
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // Read after mount so the page stays statically prerendered.
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    const reason = new URLSearchParams(window.location.search).get("reason");
+    if (reason && NOTICES[reason]) setNotice(NOTICES[reason]);
+  }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+    setNotice(null);
     setSubmitting(true);
 
     try {
@@ -27,7 +45,7 @@ export default function LoginPage() {
         password,
       });
       if (signInError) {
-        setError(signInError.message);
+        setError(authErrorMessage(signInError));
         setSubmitting(false);
         return;
       }
@@ -49,6 +67,14 @@ export default function LoginPage() {
       <p className="mt-1 text-sm text-gray-600">Welcome back. Enter your details to continue.</p>
 
       <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+        {notice && !error && (
+          <div
+            role="status"
+            className="rounded-lg border border-[#4A90E2]/20 bg-[#EBF3FC] px-3 py-2 text-sm text-gray-700"
+          >
+            {notice}
+          </div>
+        )}
         {error && (
           <div
             role="alert"
@@ -75,9 +101,17 @@ export default function LoginPage() {
         </div>
 
         <div>
-          <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-            Password
-          </label>
+          <div className="flex items-baseline justify-between">
+            <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+              Password
+            </label>
+            <Link
+              href="/forgot-password"
+              className="text-xs font-semibold text-[#4A90E2] transition hover:text-[#3A7BD5]"
+            >
+              Forgot password?
+            </Link>
+          </div>
           <div className="relative mt-1">
             <input
               id="password"

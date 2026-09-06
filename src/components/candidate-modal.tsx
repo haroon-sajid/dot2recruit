@@ -5,7 +5,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ResultCard } from "@/components/result-card";
 import { StatusBadge } from "@/components/status-badge";
+import { handleSessionExpired } from "@/lib/session";
 import type { CandidateWithResult } from "@/types";
+
+type EditField = "name" | "email" | "position";
+type EditErrors = Partial<Record<EditField, string>>;
 
 const POLL_INTERVAL_MS = 3_000;
 const POLL_TIMEOUT_MS = 3 * 60 * 1_000;
@@ -90,6 +94,7 @@ export function CandidateModal({
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [form, setForm] = useState({ name: "", email: "", position: "" });
+  const [editErrors, setEditErrors] = useState<EditErrors>({});
 
   // Load, then keep polling while the screening is still running.
   useEffect(() => {
@@ -109,6 +114,7 @@ export function CandidateModal({
       try {
         const res = await fetch(`/api/candidates/${candidateId}`, { cache: "no-store" });
         if (cancelled) return;
+        if (handleSessionExpired(res)) return;
         if (!res.ok) {
           const data = (await res.json().catch(() => null)) as { error?: string } | null;
           setError(res.status === 404 ? "Candidate not found." : (data?.error ?? "Failed to load candidate."));
@@ -134,20 +140,34 @@ export function CandidateModal({
     if (!candidate) return;
     setForm({ name: candidate.name, email: candidate.email, position: candidate.position });
     setActionError(null);
+    setEditErrors({});
     setEditing(true);
   }
 
   async function saveDetails() {
     setBusy(true);
     setActionError(null);
+    setEditErrors({});
     try {
       const res = await fetch(`/api/candidates/${candidateId}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(form),
       });
+      if (handleSessionExpired(res)) return;
       if (!res.ok) {
-        const data = (await res.json().catch(() => null)) as { error?: string } | null;
+        const data = (await res.json().catch(() => null)) as
+          | { error?: string; fieldErrors?: Partial<Record<EditField, string[]>> }
+          | null;
+        if (data?.fieldErrors) {
+          const next: EditErrors = {};
+          (Object.keys(data.fieldErrors) as EditField[]).forEach((field) => {
+            next[field] = data.fieldErrors?.[field]?.[0];
+          });
+          setEditErrors(next);
+          setActionError("Please fix the highlighted details and try again.");
+          return;
+        }
         setActionError(data?.error ?? "Could not save these details.");
         return;
       }
@@ -169,6 +189,7 @@ export function CandidateModal({
     setActionError(null);
     try {
       const res = await fetch(`/api/candidates/${candidateId}`, { method: "DELETE" });
+      if (handleSessionExpired(res)) return;
       if (!res.ok) {
         const data = (await res.json().catch(() => null)) as { error?: string } | null;
         setActionError(data?.error ?? "Could not delete this candidate.");
@@ -389,10 +410,24 @@ export function CandidateModal({
                           id={`edit-${field}`}
                           type={field === "email" ? "email" : "text"}
                           value={form[field]}
-                          onChange={(e) => setForm((prev) => ({ ...prev, [field]: e.target.value }))}
+                          onChange={(e) => {
+                            setForm((prev) => ({ ...prev, [field]: e.target.value }));
+                            setEditErrors((prev) => (prev[field] ? { ...prev, [field]: undefined } : prev));
+                          }}
                           disabled={busy}
-                          className="mt-1 block w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-[#4A90E2] focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/40 disabled:bg-gray-50"
+                          aria-invalid={Boolean(editErrors[field])}
+                          aria-describedby={editErrors[field] ? `edit-${field}-error` : undefined}
+                          className={`mt-1 block w-full rounded-lg border bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-[#4A90E2]/40 disabled:bg-gray-50 ${
+                            editErrors[field]
+                              ? "border-red-300 focus:border-[#EF4444]"
+                              : "border-gray-200 focus:border-[#4A90E2]"
+                          }`}
                         />
+                        {editErrors[field] && (
+                          <p id={`edit-${field}-error`} className="mt-1 text-xs text-red-600">
+                            {editErrors[field]}
+                          </p>
+                        )}
                       </div>
                     ))}
                   </div>

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getTenantContext } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase";
+import { failStaleScreenings } from "@/lib/stale";
 import { candidateUpdateSchema } from "@/lib/validations";
 import type { Candidate, CandidateWithResult, ScreeningResult } from "@/types";
 
@@ -26,6 +27,9 @@ export async function GET(
     if (!z.uuid().safeParse(id).success) {
       return NextResponse.json({ error: "Invalid candidate id" }, { status: 400 });
     }
+
+    // The detail page polls this route, so a dead screening is caught here too.
+    await failStaleScreenings(ctx.tenantId);
 
     const { data, error } = await supabaseAdmin
       .from("candidates")

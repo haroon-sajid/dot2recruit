@@ -4,20 +4,28 @@ import { z } from "zod";
 import { getTenantContext } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { triggerScreening } from "@/lib/n8n";
+import { checkRateLimit, RATE_LIMITS, rateLimitedResponse } from "@/lib/rate-limit";
+import { failStaleScreenings } from "@/lib/stale";
 import { candidateInputSchema } from "@/lib/validations";
 import type {
   Candidate,
+  CandidateListItem,
   CandidateStatus,
-  CandidateWithResult,
   ScreeningResult,
 } from "@/types";
 
 // Always hit the database; never prerender or cache this route.
 export const dynamic = "force-dynamic";
 
-type CandidateJoinRow = Candidate & { screening_results: ScreeningResult[] | null };
+// Two submissions of the same person for the same position inside this window
+// are treated as one accidental double submit rather than a deliberate re-screen.
+const DOUBLE_SUBMIT_WINDOW_MS = 15_000;
 
-function toCandidateWithResult(row: CandidateJoinRow): CandidateWithResult {
+type CandidateListRow = Omit<Candidate, "cv_text" | "jd_text"> & {
+  screening_results: ScreeningResult[] | null;
+};
+
+function toListItem(row: CandidateListRow): CandidateListItem {
   const { screening_results, ...candidate } = row;
   return { ...candidate, screening_result: screening_results?.[0] ?? null };
 }
@@ -40,6 +48,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const limit = checkRateLimit(ctx.userId, RATE_LIMITS.screen);
+    if (!limit.ok) return rateLimitedResponse(limit.retryAfterSec);
+
     let body: unknown;
     try {
       body = await request.json();
@@ -55,6 +66,26 @@ export async function POST(request: Request) {
       );
     }
     const input = parsed.data;
+
+    // Guard against an accidental double submit: same person, same position,
+    // a screening already running from moments ago.
+    const since = new Date(Date.now() - DOUBLE_SUBMIT_WINDOW_MS).toISOString();
+    const { data: recent } = await supabaseAdmin
+      .from("candidates")
+      .select("id")
+      .eq("tenant_id", ctx.tenantId)
+      .ilike("email", escapeLike(input.email))
+      .ilike("position", escapeLike(input.position))
+      .in("status", ["pending", "processing"])
+      .gte("created_at", since)
+      .limit(1)
+      .maybeSingle();
+    if (recent) {
+      return NextResponse.json(
+        { id: recent.id as string, error: "This candidate was submitted a moment ago and is already being screened." },
+        { status: 409 },
+      );
+    }
 
     const { data: inserted, error: insertError } = await supabaseAdmin
       .from("candidates")
@@ -101,7 +132,16 @@ export async function POST(request: Request) {
   }
 }
 
-/** GET /api/candidates — the user's tenant candidates (newest first) with their screening result. */
+/** Escapes LIKE wildcards so a literal %, _ or \ in user input matches itself. */
+function escapeLike(value: string): string {
+  return value.replace(/[\\%_]/g, (c) => `\\${c}`);
+}
+
+/**
+ * GET /api/candidates — the user's tenant candidates (newest first) with their
+ * screening result. Returns summary columns only; the CV and job description
+ * come from GET /api/candidates/[id].
+ */
 export async function GET() {
   try {
     const ctx = await getTenantContext();
@@ -109,9 +149,11 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    await failStaleScreenings(ctx.tenantId);
+
     const { data, error } = await supabaseAdmin
       .from("candidates")
-      .select("*, screening_results(*)")
+      .select("id, tenant_id, name, email, position, status, created_at, screening_results(*)")
       .eq("tenant_id", ctx.tenantId)
       .order("created_at", { ascending: false })
       .order("created_at", { referencedTable: "screening_results", ascending: false });
@@ -121,7 +163,7 @@ export async function GET() {
       return NextResponse.json({ error: "Failed to load candidates" }, { status: 500 });
     }
 
-    const candidates = ((data ?? []) as CandidateJoinRow[]).map(toCandidateWithResult);
+    const candidates = ((data ?? []) as CandidateListRow[]).map(toListItem);
     return NextResponse.json({ candidates });
   } catch (err) {
     console.error("[api/candidates] GET unhandled error:", err);

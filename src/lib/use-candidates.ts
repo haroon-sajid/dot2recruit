@@ -2,23 +2,24 @@
 "use client";
 
 import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from "react";
-import type { CandidateWithResult } from "@/types";
+import { handleSessionExpired } from "@/lib/session";
+import type { CandidateListItem } from "@/types";
 
 // Without this a hung request would leave the page on "Loading…" forever.
 const REQUEST_TIMEOUT_MS = 20_000;
 
 export interface UseCandidatesResult {
   /** null while the first request is still in flight. */
-  candidates: CandidateWithResult[] | null;
+  candidates: CandidateListItem[] | null;
   /** Lets a page apply an optimistic delete or edit without refetching. */
-  setCandidates: Dispatch<SetStateAction<CandidateWithResult[] | null>>;
+  setCandidates: Dispatch<SetStateAction<CandidateListItem[] | null>>;
   error: string | null;
   loading: boolean;
   reload: () => void;
 }
 
 export function useCandidates(): UseCandidatesResult {
-  const [candidates, setCandidates] = useState<CandidateWithResult[] | null>(null);
+  const [candidates, setCandidates] = useState<CandidateListItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
 
@@ -39,8 +40,10 @@ export function useCandidates(): UseCandidatesResult {
           cache: "no-store",
           signal: controller.signal,
         });
+        if (cancelled) return;
+        if (handleSessionExpired(res)) return;
         const data = (await res.json().catch(() => null)) as
-          | { candidates?: CandidateWithResult[]; error?: string }
+          | { candidates?: CandidateListItem[]; error?: string }
           | null;
         if (cancelled) return;
         if (!res.ok || !data?.candidates) {

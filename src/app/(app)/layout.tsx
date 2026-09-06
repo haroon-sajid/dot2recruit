@@ -1,4 +1,5 @@
 // App layout: sidebar navigation + main content area for signed-in pages.
+import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { supabaseAdmin } from "@/lib/supabase";
@@ -16,18 +17,19 @@ export default async function AppLayout({
     data: { user },
   } = await supabase.auth.getUser();
 
-  let fullName: string | null = null;
-  if (user) {
-    const { data: profile } = await supabaseAdmin
-      .from("profiles")
-      .select("full_name")
-      .eq("id", user.id)
-      .maybeSingle();
-    fullName = profile?.full_name ?? null;
-  }
+  // proxy.ts normally redirects first; this keeps every page under (app)
+  // private even if a new route is not listed there.
+  if (!user) redirect("/login");
+
+  const { data: profile } = await supabaseAdmin
+    .from("profiles")
+    .select("full_name")
+    .eq("id", user.id)
+    .maybeSingle();
+  const fullName = (profile?.full_name as string | null) ?? null;
 
   return (
-    <AppShell email={user?.email ?? null} fullName={fullName}>
+    <AppShell email={user.email ?? null} fullName={fullName}>
       {children}
     </AppShell>
   );

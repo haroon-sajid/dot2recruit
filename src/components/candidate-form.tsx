@@ -7,7 +7,13 @@ import { z } from "zod";
 import { DuplicateDialog } from "@/components/duplicate-dialog";
 import { FileDrop } from "@/components/file-drop";
 import { ScreeningResultPanel } from "@/components/screening-result-panel";
-import { candidateInputSchema, type CandidateInputSchema } from "@/lib/validations";
+import { handleSessionExpired } from "@/lib/session";
+import {
+  candidateInputSchema,
+  MAX_TEXT_LENGTH,
+  MIN_TEXT_LENGTH,
+  type CandidateInputSchema,
+} from "@/lib/validations";
 import type {
   CandidateInput,
   DuplicateCandidate,
@@ -21,7 +27,11 @@ const POSITION_OPTIONS = [
   "Backend Developer",
 ] as const;
 const CUSTOM_POSITION = "__custom__";
-const MIN_TEXT_LENGTH = 50;
+
+/** "1,234 chars · min 50 · max 50,000" for the CV and JD counters. */
+function lengthHint(length: number) {
+  return `${length.toLocaleString("en-US")} chars · min ${MIN_TEXT_LENGTH} · max ${MAX_TEXT_LENGTH.toLocaleString("en-US")}`;
+}
 
 // The in-progress form is kept in sessionStorage so a refresh does not throw away
 // extracted CV text. sessionStorage, not localStorage: a CV holds personal data,
@@ -221,7 +231,10 @@ export function CandidateForm() {
   useEffect(() => {
     let cancelled = false;
     fetch("/api/job-descriptions", { cache: "no-store" })
-      .then((res) => (res.ok ? (res.json() as Promise<{ jobDescriptions: JobDescription[] }>) : null))
+      .then((res) => {
+        if (cancelled || handleSessionExpired(res)) return null;
+        return res.ok ? (res.json() as Promise<{ jobDescriptions: JobDescription[] }>) : null;
+      })
       .then((data) => {
         if (!cancelled && data?.jobDescriptions) setPositions(data.jobDescriptions);
       })
@@ -375,6 +388,7 @@ export function CandidateForm() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify(input),
       });
+      if (handleSessionExpired(res)) return;
       const data = (await res.json().catch(() => ({}))) as {
         id?: string;
         error?: string;
@@ -512,9 +526,8 @@ export function CandidateForm() {
           <p className="mt-0.5">{apiError}</p>
           {savedId && (
             <p className="mt-1">
-              The candidate was saved.{" "}
               <a href={`/candidates/${savedId}`} className="font-medium underline">
-                View candidate
+                View the candidate
               </a>
             </p>
           )}
@@ -663,9 +676,7 @@ export function CandidateForm() {
             <label htmlFor="cvText" className="block text-sm font-medium text-gray-700">
               CV / Resume
             </label>
-            <span className="text-xs text-gray-500">
-              {cvText.trim().length} chars · min {MIN_TEXT_LENGTH}
-            </span>
+            <span className="text-xs text-gray-500">{lengthHint(cvText.trim().length)}</span>
           </div>
           <FileDrop
             label="the CV"
@@ -696,9 +707,7 @@ export function CandidateForm() {
             <label htmlFor="jdText" className="block text-sm font-medium text-gray-700">
               Job description
             </label>
-            <span className="text-xs text-gray-500">
-              {jdText.trim().length} chars · min {MIN_TEXT_LENGTH}
-            </span>
+            <span className="text-xs text-gray-500">{lengthHint(jdText.trim().length)}</span>
           </div>
           <FileDrop
             label="the job description"

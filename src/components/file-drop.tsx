@@ -4,6 +4,7 @@
 "use client";
 
 import { useId, useRef, useState, type DragEvent } from "react";
+import { handleSessionExpired } from "@/lib/session";
 import type { ExtractTextResponse } from "@/types";
 
 const ACCEPT = ".pdf,.docx,.txt";
@@ -81,17 +82,18 @@ export function FileDrop({
       const body = new FormData();
       body.append("file", file);
       const res = await fetch("/api/extract-text", { method: "POST", body });
+      if (handleSessionExpired(res)) return;
       const data = (await res.json().catch(() => null)) as
-        | (ExtractTextResponse & { error?: string; detail?: string })
+        | (ExtractTextResponse & { error?: string })
         | null;
 
       if (!res.ok || !data?.text) {
-        const base =
+        setError(
           data?.error ??
-          (res.status === 504
-            ? "The server took too long to read this file."
-            : `Upload failed (${res.status}). Please paste the text instead.`);
-        setError(data?.detail ? `${base} (${data.detail})` : base);
+            (res.status === 504 || res.status === 413
+              ? "The file could not be uploaded. Please try a smaller file or paste the text instead."
+              : "The file could not be read. Please paste the text instead."),
+        );
         return;
       }
 

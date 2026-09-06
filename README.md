@@ -111,8 +111,19 @@ See `docs/architecture.md` for more detail on each step.
 | `N8N_WEBHOOK_URL` | Production webhook URL of the screening workflow. | n8n, Webhook node, Production URL |
 | `N8N_WEBHOOK_SECRET` | Shared secret sent in the `x-webhook-secret` header. Must match the value inside the n8n workflow. | You choose it. Use a long random string. |
 | `NEXT_PUBLIC_APP_URL` | Public URL of this app. | `http://localhost:3000` locally, your Vercel URL in production |
+| `CRON_SECRET` | Secret Vercel sends with the scheduled call to `/api/cron/reap-stale`, which marks screenings that never reported back as failed. | You choose it. Use a long random string. Vercel adds the `Authorization: Bearer` header automatically for cron jobs when this variable is set. |
 
 The OpenAI key is not read by the Next.js app. It is set inside the n8n workflow, in the Call OpenAI node.
+
+### Production checklist (Supabase and Vercel settings)
+
+These are configuration steps outside the code. Without them, parts of the app will not work in production.
+
+1. **Custom SMTP for auth emails.** Supabase's built-in mailer allows only a few messages per hour, so signups and password resets fail with a rate-limit error once that is spent. In the Supabase dashboard go to Authentication, then SMTP Settings, enable a custom provider (for example Resend, Postmark or Amazon SES), and raise the email rate limit under Authentication, then Rate Limits.
+2. **Redirect URLs.** Under Authentication, then URL Configuration, set the Site URL to your deployed URL and add `https://<your-domain>/auth/callback` (and `http://localhost:3000/auth/callback` for local work) to the Redirect URLs list. Signup confirmation and password reset links return through this route.
+3. **Email templates.** The default Supabase templates work as they are. If you customise them, keep `{{ .ConfirmationURL }}` so the link carries the code that `/auth/callback` exchanges for a session.
+4. **Cron secret.** Set `CRON_SECRET` in the Vercel project. The schedule in `vercel.json` runs `/api/cron/reap-stale` every 10 minutes. The read endpoints also sweep stale screenings lazily, so this only matters for tenants nobody is looking at.
+5. **Function duration.** The candidate submit route waits up to 15 seconds for n8n. Make sure the project's function maximum duration is above that.
 
 ## 5. API Configuration
 
@@ -136,9 +147,11 @@ Request body:
 
 Returns `201` with `{ "id": "<uuid>" }`. Returns `400` with field errors if validation fails. Returns `502` if the candidate was saved but the n8n webhook could not be reached, in which case the candidate is marked `failed`.
 
+Returns `409` with the existing `id` if the same person and position were submitted seconds earlier and that screening is still running. Returns `429` when a user submits more than 20 screenings in a minute. `cvText` and `jdText` are capped at 50,000 characters each.
+
 ### GET /api/candidates
 
-Returns every candidate in the signed-in user's tenant, newest first, each with its latest screening result. Auth: session cookie.
+Returns every candidate in the signed-in user's tenant, newest first, each with its latest screening result. The CV and job description text are not included in the list; fetch one candidate for those. Screenings still marked in progress after 10 minutes are marked `failed` as part of this request. Auth: session cookie.
 
 ### GET /api/candidates/[id]
 

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getTenantContext } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase";
+import { checkRateLimit, RATE_LIMITS, rateLimitedResponse } from "@/lib/rate-limit";
 import { jobDescriptionInputSchema } from "@/lib/validations";
 import type { JobDescription } from "@/types";
 
@@ -42,6 +43,9 @@ export async function POST(request: Request) {
     if (!ctx) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const limit = checkRateLimit(ctx.userId, RATE_LIMITS.savePosition);
+    if (!limit.ok) return rateLimitedResponse(limit.retryAfterSec);
 
     let body: unknown;
     try {

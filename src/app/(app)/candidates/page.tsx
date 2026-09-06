@@ -8,8 +8,9 @@ import { DECISION_META, scoreTone } from "@/components/result-card";
 import { StatusBadge } from "@/components/status-badge";
 import { MetricCard } from "@/components/ui/metric-card";
 import { PageHeader } from "@/components/ui/page-header";
+import { handleSessionExpired } from "@/lib/session";
 import { useCandidates } from "@/lib/use-candidates";
-import type { CandidateWithResult, ScreeningResult } from "@/types";
+import type { CandidateListItem, ScreeningResult } from "@/types";
 
 function formatDate(iso: string) {
   const date = new Date(iso);
@@ -23,7 +24,7 @@ function formatDate(iso: string) {
   });
 }
 
-function computeStats(candidates: CandidateWithResult[]) {
+function computeStats(candidates: CandidateListItem[]) {
   const results = candidates
     .map((c) => c.screening_result)
     .filter((r): r is ScreeningResult => r !== null);
@@ -35,7 +36,7 @@ function computeStats(candidates: CandidateWithResult[]) {
     total: candidates.length,
     averageScore,
     strongMatches: results.filter((r) => r.decision === "strong_match").length,
-    pendingReview: results.filter((r) => r.approval_status === "pending_review").length,
+    inProgress: candidates.filter((c) => c.status === "pending" || c.status === "processing").length,
   };
 }
 
@@ -44,7 +45,7 @@ function CandidateCard({
   onOpen,
   onDeleted,
 }: {
-  candidate: CandidateWithResult;
+  candidate: CandidateListItem;
   onOpen: () => void;
   onDeleted: (id: string) => void;
 }) {
@@ -57,6 +58,7 @@ function CandidateCard({
     setDeleting(true);
     try {
       const res = await fetch(`/api/candidates/${candidate.id}`, { method: "DELETE" });
+      if (handleSessionExpired(res)) return;
       if (res.ok) {
         onDeleted(candidate.id);
         return;
@@ -196,7 +198,7 @@ export default function CandidatesPage() {
           hint="Completed screenings"
         />
         <MetricCard title="Strong Matches" value={stats.strongMatches} hint="Decision: strong" />
-        <MetricCard title="Pending Review" value={stats.pendingReview} hint="Awaiting decision" />
+        <MetricCard title="In Progress" value={stats.inProgress} hint="Screenings still running" />
       </div>
 
       {error ? (

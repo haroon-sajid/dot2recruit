@@ -1,4 +1,4 @@
-// Dot2Recruit landing page — rebuilt to match the provided reference layout
+// Dot2Recruit landing page â€” rebuilt to match the provided reference layout
 // using the project's real content, colors, and assets.
 "use client";
 
@@ -6,7 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
-// ── Shared icons ──────────────────────────────────────────────────────────────
+// â”€â”€ Shared icons â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function ArrowUpRight({ className = "h-4 w-4" }: { className?: string }) {
   return (
@@ -100,7 +100,7 @@ function ChevronRight({ className = "h-5 w-5" }: { className?: string }) {
   );
 }
 
-// ── Reveal-on-scroll hook ─────────────────────────────────────────────────────
+// â”€â”€ Reveal-on-scroll hook â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function useReveal() {
   useEffect(() => {
@@ -122,7 +122,7 @@ function useReveal() {
   }, []);
 }
 
-// ── Data (sourced from the real project) ──────────────────────────────────────
+// â”€â”€ Data (sourced from the real project) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const NAV_LINKS = [
   { href: "#features", label: "Features" },
@@ -299,26 +299,24 @@ const FOOTER_LINKS = [
     ],
   },
   {
-    title: "Company",
+    title: "Learn more",
     links: [
-      { label: "About", href: "#" },
-      { label: "Careers", href: "#" },
-      { label: "Contact", href: "#" },
+      { label: "How it works", href: "#benefits" },
+      { label: "FAQ", href: "#faq" },
       { label: "Blog", href: "#insights" },
     ],
   },
   {
-    title: "Resources",
+    title: "Account",
     links: [
-      { label: "Help Center", href: "#" },
-      { label: "Privacy", href: "#" },
-      { label: "Terms", href: "#" },
-      { label: "Guide", href: "#" },
+      { label: "Sign in", href: "/login" },
+      { label: "Create account", href: "/signup" },
+      { label: "Reset password", href: "/forgot-password" },
     ],
   },
 ];
 
-// ── Illustrations ─────────────────────────────────────────────────────────────
+// â”€â”€ Illustrations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function HeroIllustration() {
   return (
@@ -364,7 +362,7 @@ function MapIllustration() {
   );
 }
 
-// ── Section components ────────────────────────────────────────────────────────
+// â”€â”€ Section components â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function Logo({ light = false }: { light?: boolean }) {
   return (
@@ -375,8 +373,62 @@ function Logo({ light = false }: { light?: boolean }) {
   );
 }
 
+/** Whether a session exists, so the header can point at the dashboard instead of sign-in. */
+function useSignedIn(): boolean {
+  const [signedIn, setSignedIn] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/me", { cache: "no-store" })
+      .then((res) => {
+        if (!cancelled && res.ok) setSignedIn(true);
+      })
+      .catch(() => {
+        // Treat any failure as signed out; the links still work.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  return signedIn;
+}
+
+function AccountLinks({ signedIn, mobile = false }: { signedIn: boolean; mobile?: boolean }) {
+  if (signedIn) {
+    return (
+      <Link
+        href="/dashboard"
+        className={
+          mobile
+            ? "inline-flex items-center justify-center rounded-full bg-accent px-5 py-2.5 text-sm font-semibold text-white"
+            : "rounded-full bg-accent px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-accent-hover hover:shadow-card-hover"
+        }
+      >
+        Go to dashboard
+      </Link>
+    );
+  }
+  return (
+    <>
+      <Link href="/login" className={mobile ? "text-sm font-semibold text-ink" : "text-sm font-semibold text-ink transition hover:text-accent"}>
+        Sign In
+      </Link>
+      <Link
+        href="/signup"
+        className={
+          mobile
+            ? "inline-flex items-center justify-center rounded-full bg-accent px-5 py-2.5 text-sm font-semibold text-white"
+            : "rounded-full bg-accent px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-accent-hover hover:shadow-card-hover"
+        }
+      >
+        Get Started
+      </Link>
+    </>
+  );
+}
+
 function Navbar() {
   const [open, setOpen] = useState(false);
+  const signedIn = useSignedIn();
   return (
     <header className="sticky top-0 z-50 border-b border-landing bg-white/80 backdrop-blur-md">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 lg:px-6">
@@ -389,15 +441,7 @@ function Navbar() {
           ))}
         </nav>
         <div className="hidden items-center gap-4 md:flex">
-          <Link href="/login" className="text-sm font-semibold text-ink transition hover:text-accent">
-            Sign In
-          </Link>
-          <Link href="/signup" className="rounded-full bg-accent px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-accent-hover hover:shadow-card-hover">
-            Get Started
-          </Link>
-          <button className="flex h-10 w-10 items-center justify-center rounded-full border border-landing text-ink transition hover:border-accent hover:text-accent">
-            <ArrowUpRight />
-          </button>
+          <AccountLinks signedIn={signedIn} />
         </div>
         <button
           type="button"
@@ -418,10 +462,7 @@ function Navbar() {
             ))}
           </nav>
           <div className="mt-4 flex flex-col gap-3 border-t border-landing pt-4">
-            <Link href="/login" className="text-sm font-semibold text-ink">Sign In</Link>
-            <Link href="/signup" className="inline-flex items-center justify-center rounded-full bg-accent px-5 py-2.5 text-sm font-semibold text-white">
-              Get Started
-            </Link>
+            <AccountLinks signedIn={signedIn} mobile />
           </div>
         </div>
       )}
@@ -842,7 +883,7 @@ function Blog() {
               <div className={`h-44 w-full rounded-xl bg-gradient-to-br ${post.gradient}`} />
               <div className="mt-4 flex items-center gap-2 text-xs text-slate-500">
                 <span>{post.date}</span>
-                <span>•</span>
+                <span>â€¢</span>
                 <span>{post.readTime}</span>
               </div>
               <h3 className="mt-2 text-base font-bold text-ink transition group-hover:text-accent">{post.title}</h3>
@@ -860,33 +901,19 @@ function FooterCTA() {
       <div className="mx-auto max-w-7xl px-4 lg:px-6">
         <div className="rounded-[2rem] bg-ink px-6 py-14 lg:px-12 lg:py-20">
           <div className="flex flex-col items-start justify-between gap-8 sm:flex-row sm:items-center">
-            <h2 className="text-4xl font-bold text-white sm:text-5xl lg:text-6xl">Let&apos;s Contact</h2>
-            <button className="flex h-16 w-16 items-center justify-center rounded-full bg-accent text-white transition hover:scale-105 hover:bg-accent-hover">
+            <h2 className="text-4xl font-bold text-white sm:text-5xl lg:text-6xl">Start screening today</h2>
+            <Link
+              href="/signup"
+              aria-label="Create an account"
+              className="flex h-16 w-16 items-center justify-center rounded-full bg-accent text-white transition hover:scale-105 hover:bg-accent-hover"
+            >
               <ArrowUpRight className="h-6 w-6" />
-            </button>
+            </Link>
           </div>
           <div className="mt-14 grid gap-10 border-t border-white/10 pt-10 lg:grid-cols-5">
             <div className="lg:col-span-2">
               <Logo light />
               <p className="mt-4 max-w-xs text-sm leading-relaxed text-slate-400">AI-powered recruitment screening system built with Next.js, Supabase, and n8n.</p>
-              <div className="mt-6 flex gap-3">
-                {[
-                  { label: "LinkedIn", d: "M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-4 0v7h-4v-7a6 6 0 0 1 6-6zM2 9h4v12H2zM4 6a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" },
-                  { label: "X", d: "M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" },
-                  { label: "GitHub", d: "M12 2C6.48 2 2 6.48 2 12c0 4.42 2.87 8.17 6.84 9.49.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.15-1.11-1.46-1.11-1.46-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.89 1.52 2.34 1.08 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02A9.56 9.56 0 0 1 12 6.8c.85.01 1.71.11 2.51.32 1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.69-4.57 4.93.36.31.68.92.68 1.85v2.74c0 .27.18.58.69.48A10 10 0 0 0 22 12c0-5.52-4.48-10-10-10z" },
-                ].map((social) => (
-                  <a
-                    key={social.label}
-                    href="#"
-                    aria-label={social.label}
-                    className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 text-white transition hover:bg-white/10"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
-                      <path d={social.d} />
-                    </svg>
-                  </a>
-                ))}
-              </div>
             </div>
             {FOOTER_LINKS.map((col) => (
               <div key={col.title}>
@@ -904,7 +931,7 @@ function FooterCTA() {
             ))}
           </div>
           <p className="mt-10 border-t border-white/10 pt-6 text-center text-xs text-slate-500">
-            © {new Date().getFullYear()} Dot2Recruit. All rights reserved.
+            Â© {new Date().getFullYear()} Dot2Recruit. All rights reserved.
           </p>
         </div>
       </div>
@@ -912,7 +939,7 @@ function FooterCTA() {
   );
 }
 
-// ── Page ──────────────────────────────────────────────────────────────────────
+// â”€â”€ Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export default function LandingPage() {
   useReveal();

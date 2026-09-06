@@ -3,6 +3,7 @@
 
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
+import { authErrorMessage } from "@/lib/auth-errors";
 import { createBrowserSupabaseClient } from "@/lib/supabase-browser";
 
 const MIN_PASSWORD_LENGTH = 8;
@@ -40,10 +41,19 @@ export default function SignupPage() {
             full_name: fullName.trim(),
             company_name: companyName.trim(),
           },
+          // The confirmation link comes back through the code exchange route.
+          emailRedirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
         },
       });
       if (signUpError) {
-        setError(signUpError.message);
+        setError(authErrorMessage(signUpError));
+        setSubmitting(false);
+        return;
+      }
+      // Supabase answers an already-registered email with a user that has no
+      // identities, rather than an error, to avoid leaking who has an account.
+      if (data.user && data.user.identities?.length === 0) {
+        setError("An account with this email already exists. Sign in instead.");
         setSubmitting(false);
         return;
       }

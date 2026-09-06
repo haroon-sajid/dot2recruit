@@ -3,6 +3,9 @@
 import { NextResponse } from "next/server";
 import { getTenantContext } from "@/lib/auth";
 import { detectFields } from "@/lib/extract-detect";
+import { orderPageText, type PositionedText } from "@/lib/pdf-layout";
+import { checkRateLimit, RATE_LIMITS, rateLimitedResponse } from "@/lib/rate-limit";
+import { MAX_TEXT_LENGTH, MIN_TEXT_LENGTH } from "@/lib/validations";
 import type { ExtractTextResponse } from "@/types";
 
 export const dynamic = "force-dynamic";
@@ -10,7 +13,6 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 const MAX_BYTES = 5 * 1024 * 1024;
-const MIN_TEXT_LENGTH = 50;
 
 type Kind = "pdf" | "docx" | "txt";
 
@@ -55,6 +57,29 @@ async function extract(file: File, kind: Kind): Promise<string> {
   // requires and no bundled per-version pdf.js copies, which is what broke on Vercel.
   const { extractText, getDocumentProxy } = await import("unpdf");
   const pdf = await getDocumentProxy(new Uint8Array(buffer));
+
+  // Positioned text lets the page be read in column order. Fall back to the
+  // plain content-stream order if a page cannot be laid out.
+  try {
+    const pages: string[] = [];
+    for (let i = 1; i <= pdf.numPages; i += 1) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      // Marked-content entries carry no text; keep only real text items.
+      const items: PositionedText[] = [];
+      for (const item of content.items) {
+        if ("str" in item && typeof item.str === "string" && Array.isArray(item.transform)) {
+          items.push({ str: item.str, transform: item.transform, width: item.width, height: item.height });
+        }
+      }
+      pages.push(orderPageText(items));
+    }
+    const text = pages.join("\n\n");
+    if (text.trim().length > 0) return text;
+  } catch (err) {
+    console.warn("[api/extract-text] Layout-aware PDF read failed, using plain order:", err);
+  }
+
   const { text } = await extractText(pdf, { mergePages: true });
   return text;
 }
@@ -66,6 +91,9 @@ export async function POST(request: Request) {
     if (!ctx) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const limit = checkRateLimit(ctx.userId, RATE_LIMITS.extract);
+    if (!limit.ok) return rateLimitedResponse(limit.retryAfterSec);
 
     let form: FormData;
     try {
@@ -103,16 +131,11 @@ export async function POST(request: Request) {
     try {
       raw = await extract(file, kind);
     } catch (err) {
+      // The parser's message stays in the server log; the user only needs to
+      // know the file could not be read.
       console.error(`[api/extract-text] ${kind} extraction failed:`, err);
-      // The parser's own message is included so a deployment-specific failure
-      // (a missing module, an unsupported runtime) is visible without digging
-      // through server logs. It carries no secrets, only the library's error.
-      const detail = err instanceof Error ? err.message.slice(0, 200) : String(err).slice(0, 200);
       return NextResponse.json(
-        {
-          error: "Could not read this file. It may be corrupt or password protected.",
-          detail: `${kind}: ${detail}`,
-        },
+        { error: "Could not read this file. It may be corrupt or password protected. Please paste the text instead." },
         { status: 400 },
       );
     }
@@ -122,6 +145,14 @@ export async function POST(request: Request) {
       // Most often a scanned PDF with no text layer.
       return NextResponse.json(
         { error: "Could not read enough text from this file, please paste the text instead" },
+        { status: 422 },
+      );
+    }
+    if (text.length > MAX_TEXT_LENGTH) {
+      return NextResponse.json(
+        {
+          error: `This file contains more than ${MAX_TEXT_LENGTH.toLocaleString("en-US")} characters of text. Please upload a shorter document or paste the relevant part.`,
+        },
         { status: 422 },
       );
     }

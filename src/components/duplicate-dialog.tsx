@@ -95,9 +95,10 @@ export function DuplicateDialog({
               Already screened
             </h2>
             <p id="duplicate-description" className="mt-1 text-sm text-gray-600">
-              {name} has already been screened for {position}
-              {completed.length > 0 ? " and a result is available" : ""}. Screening again will
-              call the AI and use credits.
+              {completed.length > 0
+                ? `${name} has already been screened for ${position} and a result is available.`
+                : `${name} was already submitted for ${position}, but that screening did not complete.`}{" "}
+              Screening again will call the AI and use credits.
             </p>
           </div>
         </div>

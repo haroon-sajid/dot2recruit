@@ -7,6 +7,11 @@ import type { Candidate, DuplicateCandidate, ScreeningResult } from "@/types";
 
 export const dynamic = "force-dynamic";
 
+/** Escapes LIKE wildcards so a literal %, _ or \ in user input matches itself. */
+function escapeLike(value: string): string {
+  return value.replace(/[\\%_]/g, (c) => `\\${c}`);
+}
+
 type Row = Pick<Candidate, "id" | "name" | "position" | "status" | "created_at"> & {
   screening_results: Pick<ScreeningResult, "overall_score" | "decision" | "created_at">[] | null;
 };
@@ -29,14 +34,14 @@ export async function GET(request: Request) {
       );
     }
 
-    // ilike without wildcards is an exact match that ignores case. The values are
-    // passed as parameters, so % or _ typed by a user cannot widen the match.
+    // ilike is used only for its case-insensitivity: wildcards in the user's
+    // input are escaped so % and _ match themselves.
     const { data, error } = await supabaseAdmin
       .from("candidates")
       .select("id, name, position, status, created_at, screening_results(overall_score, decision, created_at)")
       .eq("tenant_id", ctx.tenantId)
-      .ilike("email", email)
-      .ilike("position", position)
+      .ilike("email", escapeLike(email))
+      .ilike("position", escapeLike(position))
       .order("created_at", { ascending: false })
       .order("created_at", { referencedTable: "screening_results", ascending: false });
 

@@ -299,11 +299,17 @@ export function Sidebar({
   fullName,
   collapsed,
   onToggle,
+  mobileOpen = false,
+  onMobileClose,
 }: {
   email: string | null;
   fullName: string | null;
+  /** Icon rail on desktop. Ignored below lg, where the drawer always shows labels. */
   collapsed: boolean;
   onToggle: () => void;
+  /** Drawer state below lg. */
+  mobileOpen?: boolean;
+  onMobileClose?: () => void;
 }) {
   const pathname = usePathname();
   const [loggingOut, setLoggingOut] = useState(false);
@@ -317,22 +323,23 @@ export function Sidebar({
 
   return (
     <aside
-      className={`fixed left-0 top-0 z-30 flex h-screen flex-col border-r border-gray-100 bg-white transition-[width] duration-300 ease-in-out ${
-        collapsed ? "w-[72px]" : "w-[240px]"
-      }`}
+      aria-label="Main navigation"
+      className={`fixed left-0 top-0 z-40 flex h-screen w-[240px] flex-col border-r border-gray-100 bg-white shadow-[8px_0_24px_rgba(15,23,42,0.08)] transition-[transform,width] duration-300 ease-in-out lg:translate-x-0 lg:shadow-none ${
+        mobileOpen ? "translate-x-0" : "-translate-x-full"
+      } ${collapsed ? "lg:w-[72px]" : "lg:w-[240px]"}`}
     >
-      {/* Edge toggle */}
+      {/* Edge toggle: desktop only */}
       <button
         type="button"
         onClick={onToggle}
         aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-        className="absolute -right-4 top-5 z-40 flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 shadow-sm transition hover:border-gray-300 hover:text-gray-900"
+        className="absolute -right-4 top-5 z-40 hidden h-8 w-8 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 shadow-sm transition hover:border-gray-300 hover:text-gray-900 lg:flex"
       >
         {collapsed ? <IconChevronsRight /> : <IconChevronsLeft />}
       </button>
 
-      {/* Logo */}
-      <div className="flex items-center px-4 py-5">
+      {/* Logo, plus a close button while open as a drawer */}
+      <div className="flex items-center justify-between px-4 py-5">
         <Link href="/dashboard" className="flex items-center gap-2.5 overflow-hidden">
           <Image
             src="/favicon.png"
@@ -349,6 +356,16 @@ export function Sidebar({
             Dot2Recruit
           </span>
         </Link>
+        <button
+          type="button"
+          onClick={onMobileClose}
+          aria-label="Close navigation"
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition hover:bg-gray-50 hover:text-gray-900 lg:hidden"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
+            <path d="M18 6L6 18M6 6l12 12" />
+          </svg>
+        </button>
       </div>
 
       {/* Main navigation */}

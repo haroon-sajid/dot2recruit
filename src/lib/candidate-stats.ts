@@ -1,7 +1,7 @@
 // Derives dashboard/report figures from the candidate list returned by GET /api/candidates.
 import type {
+  CandidateListItem,
   CandidateStatus,
-  CandidateWithResult,
   Decision,
   ScreeningResult,
 } from "@/types";
@@ -29,7 +29,7 @@ function emptyCounts<K extends string>(keys: readonly K[]): Record<K, number> {
 }
 
 export function computeStats(
-  candidates: CandidateWithResult[],
+  candidates: CandidateListItem[],
   now: number = Date.now(),
 ): CandidateStats {
   const results = candidates

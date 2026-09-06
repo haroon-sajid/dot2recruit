@@ -2,16 +2,35 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-// Reachable without a session: the marketing landing page, the auth pages, and the
-// n8n result callback (which authenticates with a shared secret instead of a session).
-const PUBLIC_PATHS = ["/", "/login", "/signup", "/api/webhook/result"];
+// Everything under these prefixes needs a session. Unknown paths fall through to
+// Next's 404 page instead of bouncing to login; the (app) layout and every API
+// route check the session themselves, so a page missing from this list is still
+// protected, it just would not redirect from here.
+const PROTECTED_PREFIXES = [
+  "/dashboard",
+  "/new-candidate",
+  "/candidates",
+  "/positions",
+  "/analytics",
+  "/interviews",
+  "/hiring-assistant",
+  "/alerts",
+  "/settings",
+  "/api",
+];
+
+// Reachable without a session: the n8n result callback (shared secret), the
+// Vercel cron (its own secret), and the auth code exchange.
+const PUBLIC_API = ["/api/webhook/result", "/api/cron/reap-stale"];
 const AUTH_PAGES = ["/login", "/signup"];
 
-function isPublic(pathname: string) {
-  // "/" must match exactly — as a prefix it would make every route public.
-  return PUBLIC_PATHS.some(
-    (p) => pathname === p || (p !== "/" && pathname.startsWith(`${p}/`)),
-  );
+function startsWithPath(pathname: string, prefix: string) {
+  return pathname === prefix || pathname.startsWith(`${prefix}/`);
+}
+
+function isProtected(pathname: string) {
+  if (PUBLIC_API.some((p) => startsWithPath(pathname, p))) return false;
+  return PROTECTED_PREFIXES.some((p) => startsWithPath(pathname, p));
 }
 
 export async function proxy(request: NextRequest) {
@@ -45,7 +64,7 @@ export async function proxy(request: NextRequest) {
   } = await supabase.auth.getUser();
   const { pathname } = request.nextUrl;
 
-  if (!user && !isPublic(pathname)) {
+  if (!user && isProtected(pathname)) {
     if (pathname.startsWith("/api/")) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

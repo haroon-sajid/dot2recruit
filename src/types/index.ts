@@ -54,10 +54,16 @@ export interface ScreeningResult {
   created_at: string;
 }
 
-/** Candidate with its (latest) screening result, as returned by the API. */
+/** Candidate with its (latest) screening result, as returned by GET /api/candidates/[id]. */
 export interface CandidateWithResult extends Candidate {
   screening_result: ScreeningResult | null;
 }
+
+/**
+ * List row returned by GET /api/candidates. The CV and job description are
+ * left out so list pages do not download every document in the tenant.
+ */
+export type CandidateListItem = Omit<CandidateWithResult, "cv_text" | "jd_text">;
 
 /** Slim record of a prior screening for the same person and position. */
 export interface DuplicateCandidate {
