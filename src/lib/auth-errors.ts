@@ -2,7 +2,7 @@
 import type { AuthError } from "@supabase/supabase-js";
 
 const BY_CODE: Record<string, string> = {
-  invalid_credentials: "That email and password combination is not right. Please try again.",
+  invalid_credentials: "Your email or password is incorrect. Please try again.",
   email_not_confirmed: "Please confirm your email address first. Check your inbox for the confirmation link.",
   user_already_exists: "An account with this email already exists. Sign in instead.",
   email_exists: "An account with this email already exists. Sign in instead.",
